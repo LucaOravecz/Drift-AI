@@ -15,6 +15,9 @@ export type AgentStatus = 'RUNNING' | 'IDLE' | 'PAUSED' | 'ERROR' | 'REVIEW_NEED
 export interface AgentDefinitionWithRelations extends AgentDefinition {
   recentTasks: (AgentTask & { agent?: AgentDefinition })[]
   outputs: (AgentOutput & { approvals?: any[] })[]
+  currentTask?: string | null
+  taskQueueCount?: number
+  linkedRecord?: string | null
 }
 
 export const AgentService = {
@@ -239,17 +242,11 @@ export const AgentService = {
       data: { reviewStatus: 'APPROVED' },
     })
 
-    // Decrement pending reviews
-    const agent = await prisma.agentDefinition.findUnique({
-      where: { id: output.agentId },
+    // Decrement pending reviews atomically to avoid race condition
+    await prisma.agentDefinition.updateMany({
+      where: { id: output.agentId, pendingReviews: { gt: 0 } },
+      data: { pendingReviews: { decrement: 1 } },
     })
-
-    if (agent && agent.pendingReviews > 0) {
-      await prisma.agentDefinition.update({
-        where: { id: output.agentId },
-        data: { pendingReviews: agent.pendingReviews - 1 },
-      })
-    }
 
     return { success: true }
   },
@@ -274,17 +271,11 @@ export const AgentService = {
       data: { reviewStatus: 'DISMISSED' },
     })
 
-    // Decrement pending reviews
-    const agent = await prisma.agentDefinition.findUnique({
-      where: { id: output.agentId },
+    // Decrement pending reviews atomically to avoid race condition
+    await prisma.agentDefinition.updateMany({
+      where: { id: output.agentId, pendingReviews: { gt: 0 } },
+      data: { pendingReviews: { decrement: 1 } },
     })
-
-    if (agent && agent.pendingReviews > 0) {
-      await prisma.agentDefinition.update({
-        where: { id: output.agentId },
-        data: { pendingReviews: agent.pendingReviews - 1 },
-      })
-    }
 
     return { success: true }
   },

@@ -641,9 +641,12 @@ export async function unblockOnboardingStep(stepId: string) {
 }
 
 export async function advanceProspectStage(id: string) {
-  const orgId = await getOrgId();
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'CLIENT_WRITE', `Prospect:${id}`);
+
   const stageOrder = ["LEAD", "QUALIFIED", "DISCOVERY", "PROPOSAL", "NEGOTIATION", "CLOSED_WON"];
-  const prospect = await prisma.prospect.findFirst({ where: { id, organizationId: orgId } });
+  const prospect = await prisma.prospect.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!prospect) throw new Error("Prospect not found");
   const currentIdx = stageOrder.indexOf(prospect.stage);
   const nextStage =
@@ -656,7 +659,8 @@ export async function advanceProspectStage(id: string) {
   });
   await prisma.auditLog.create({
     data: {
-      organizationId: orgId,
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
       action: "PROSPECT_STAGE_ADVANCED",
       target: `Prospect:${id}`,
       details: `Prospect "${prospect.name}" advanced from ${prospect.stage} to ${nextStage}.`,
@@ -667,14 +671,18 @@ export async function advanceProspectStage(id: string) {
 }
 
 export async function dismissComplianceFlag(id: string) {
-  const orgId = await getOrgId();
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'COMPLIANCE_RESOLVE', `ComplianceFlag:${id}`);
+
   await prisma.complianceFlag.update({
-    where: { id },
-    data: { status: "DISMISSED", resolvedAt: new Date() },
+    where: { id, organizationId: ctx.organizationId },
+    data: { status: "DISMISSED", resolvedAt: new Date(), reviewedBy: ctx.userId },
   });
   await prisma.auditLog.create({
     data: {
-      organizationId: orgId,
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
       action: "COMPLIANCE_FLAG_DISMISSED",
       target: `ComplianceFlag:${id}`,
       details: "Advisor dismissed compliance flag.",
@@ -767,19 +775,23 @@ export async function scanClientOpportunities() {
 }
 
 export async function sendRelationshipOutreach(id: string) {
-  const orgId = await getOrgId();
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'COMMUNICATION_SEND', `RelationshipEvent:${id}`);
+
   const event = await prisma.relationshipEvent.findUnique({
     where: { id },
     include: { client: true },
   });
-  if (!event) throw new Error("Relationship event not found");
+  if (!event || event.client.organizationId !== ctx.organizationId) throw new Error("Relationship event not found");
   await prisma.relationshipEvent.update({
     where: { id },
     data: { status: "OUTREACH_SENT" },
   });
   await prisma.auditLog.create({
     data: {
-      organizationId: orgId,
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
       action: "RELATIONSHIP_OUTREACH_SENT",
       target: `RelationshipEvent:${id}`,
       details: `Outreach sent for "${event.title}" — client: ${event.client.name}.`,
@@ -813,14 +825,18 @@ export async function refreshClientMemory(clientId: string) {
 }
 
 export async function completeRelationshipEvent(id: string) {
-  const orgId = await getOrgId();
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'CLIENT_WRITE', `RelationshipEvent:${id}`);
+
   await prisma.relationshipEvent.update({
     where: { id },
     data: { status: "COMPLETED" },
   });
   await prisma.auditLog.create({
     data: {
-      organizationId: orgId,
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
       action: "RELATIONSHIP_EVENT_COMPLETED",
       target: `RelationshipEvent:${id}`,
       details: "Relationship event marked as completed.",
@@ -838,16 +854,28 @@ export async function syncCalendar() {
   return { success: true, imported: result.imported };
 }
 
+const CLIENT_UPDATABLE_FIELDS = [
+  'name', 'email', 'phone', 'type', 'riskProfile', 'householdId',
+  'aum', 'notes', 'lastContactAt', 'tags', 'status',
+] as const;
+
 export async function updateClient(id: string, data: Record<string, unknown>) {
   const ctx = await getSecurityContext();
   if (!ctx) throw new Error("Unauthenticated");
 
   await SecurityService.enforceAccess(ctx, "CLIENT_WRITE", `Client:${id}`);
 
+  const filteredData: Record<string, unknown> = {};
+  for (const key of CLIENT_UPDATABLE_FIELDS) {
+    if (key in data) {
+      filteredData[key] = data[key];
+    }
+  }
+
   const before = await prisma.client.findUnique({ where: { id, organizationId: ctx.organizationId } });
   const after = await prisma.client.update({
     where: { id },
-    data,
+    data: filteredData,
   });
 
   await AuditService.logAction({
@@ -992,41 +1020,46 @@ export async function createNewOnboarding(clientId: string) {
 import { AgentService } from "@/lib/services/agent.service";
 
 export async function runAgent(agentId: string) {
-  const org = await prisma.organization.findFirst();
-  const organizationId = org?.id || 'org-demo';
-  const result = await AgentService.runAgent(agentId, organizationId);
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'AI_GENERATION', `Agent:${agentId}`);
+  const result = await AgentService.runAgent(agentId, ctx.organizationId);
   revalidatePath("/agents");
   return result;
 }
 
 export async function pauseAgent(agentId: string) {
-  const org = await prisma.organization.findFirst();
-  const organizationId = org?.id || 'org-demo';
-  const result = await AgentService.pauseAgent(agentId, organizationId);
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'AI_GENERATION', `Agent:${agentId}`);
+  const result = await AgentService.pauseAgent(agentId, ctx.organizationId);
   revalidatePath("/agents");
   return result;
 }
 
 export async function resumeAgent(agentId: string) {
-  const org = await prisma.organization.findFirst();
-  const organizationId = org?.id || 'org-demo';
-  const result = await AgentService.resumeAgent(agentId, organizationId);
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'AI_GENERATION', `Agent:${agentId}`);
+  const result = await AgentService.resumeAgent(agentId, ctx.organizationId);
   revalidatePath("/agents");
   return result;
 }
 
 export async function approveAgentOutput(outputId: string) {
-  const org = await prisma.organization.findFirst();
-  const organizationId = org?.id || 'org-demo';
-  const result = await AgentService.approveOutput(outputId, organizationId);
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'COMMUNICATION_APPROVE', `AgentOutput:${outputId}`);
+  const result = await AgentService.approveOutput(outputId, ctx.organizationId);
   revalidatePath("/agents");
   return result;
 }
 
 export async function dismissAgentOutput(outputId: string) {
-  const org = await prisma.organization.findFirst();
-  const organizationId = org?.id || 'org-demo';
-  const result = await AgentService.dismissOutput(outputId, organizationId);
+  const ctx = await getSecurityContext();
+  if (!ctx) throw new Error("Unauthenticated");
+  await SecurityService.enforceAccess(ctx, 'COMMUNICATION_APPROVE', `AgentOutput:${outputId}`);
+  const result = await AgentService.dismissOutput(outputId, ctx.organizationId);
   revalidatePath("/agents");
   return result;
 }

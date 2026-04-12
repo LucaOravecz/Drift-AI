@@ -14,14 +14,14 @@ import {
 } from "lucide-react";
 import { runAgent, pauseAgent, resumeAgent, approveAgentOutput, dismissAgentOutput } from "@/lib/actions";
 import type { AgentDefinition, AgentOutput, AgentTask } from "@prisma/client";
-import type { AgentStatus } from "@/lib/services/agent.service";
+import type { AgentStatus, AgentDefinitionWithRelations } from "@/lib/services/agent.service";
 
 // --------------------------------------------------
 // Types
 // --------------------------------------------------
 
 interface AgentCommandCenterProps {
-  agents: AgentDefinition[];
+  agents: AgentDefinitionWithRelations[];
   workload: {
     totalAgents: number;
     running: number;
@@ -66,7 +66,8 @@ const REVIEW_BADGE: Record<string, string> = {
   DISMISSED:"bg-zinc-500/10 text-zinc-500 border-zinc-700",
 };
 
-function timeAgo(date: Date): string {
+function timeAgo(date: Date | null): string {
+  if (!date) return "Never";
   const d = new Date(date);
   const diff = Date.now() - d.getTime();
   const m = Math.floor(diff / 60000);
@@ -95,11 +96,11 @@ function AgentDrawer({
   onClose,
   onAction,
 }: {
-  agent: AgentDefinition;
+  agent: AgentDefinitionWithRelations;
   onClose: () => void;
   onAction: (type: "run" | "pause" | "resume" | "approve" | "dismiss", id: string) => void;
 }) {
-  const sc = STATUS_CONFIG[agent.status];
+  const sc = STATUS_CONFIG[agent.status as AgentStatus];
   const Icon = ICON_MAP[agent.icon] ?? Bot;
 
   return (
@@ -274,12 +275,12 @@ function AgentCard({
   onAction,
   actionLoading,
 }: {
-  agent: AgentDefinition;
+  agent: AgentDefinitionWithRelations;
   onSelect: () => void;
   onAction: (type: "run" | "pause" | "resume", id: string) => void;
   actionLoading: string | null;
 }) {
-  const sc = STATUS_CONFIG[agent.status];
+  const sc = STATUS_CONFIG[agent.status as AgentStatus];
   const Icon = ICON_MAP[agent.icon] ?? Bot;
   const isLoading = actionLoading === agent.id;
 
@@ -408,7 +409,7 @@ interface FeedEvent {
   type: "success" | "info" | "warning" | "error";
 }
 
-function buildFeed(agents: AgentDefinition[]): FeedEvent[] {
+function buildFeed(agents: AgentDefinitionWithRelations[]): FeedEvent[] {
   const events: FeedEvent[] = [];
   for (const agent of agents) {
     for (const task of agent.recentTasks.slice(0, 2)) {
@@ -418,7 +419,7 @@ function buildFeed(agents: AgentDefinition[]): FeedEvent[] {
         agentColor: agent.colorClass,
         action: task.status === "COMPLETED" ? "Completed task" : task.status === "IN_PROGRESS" ? "Started task" : "Failed task",
         detail: task.description,
-        time: task.completedAt ?? task.startedAt,
+        time: task.completedAt ?? task.startedAt ?? task.createdAt,
         type: task.status === "COMPLETED" ? "success" : task.status === "IN_PROGRESS" ? "info" : "error",
       });
     }
@@ -444,9 +445,9 @@ const feedTypeColor: Record<string, string> = {
 // --------------------------------------------------
 
 export function AgentCommandCenterClient({ agents: initialAgents, workload: initialWorkload }: AgentCommandCenterProps) {
-  const [agents, setAgents] = useState<AgentDefinition[]>(initialAgents);
+  const [agents, setAgents] = useState<AgentDefinitionWithRelations[]>(initialAgents);
   const [workload, setWorkload] = useState(initialWorkload);
-  const [selectedAgent, setSelectedAgent] = useState<AgentDefinition | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<AgentDefinitionWithRelations | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -461,7 +462,7 @@ export function AgentCommandCenterClient({ agents: initialAgents, workload: init
           setWorkload(data.workload);
           // Keep drawer in sync
           if (selectedAgent) {
-            const updated = data.agents.find((a: AgentDefinition) => a.id === selectedAgent.id);
+            const updated = data.agents.find((a: AgentDefinitionWithRelations) => a.id === selectedAgent.id);
             if (updated) setSelectedAgent(updated);
           }
         }
@@ -470,7 +471,7 @@ export function AgentCommandCenterClient({ agents: initialAgents, workload: init
       }
     }, 8000);
     return () => clearInterval(interval);
-  }, [selectedAgent]);
+  }, [selectedAgent?.id]);
 
   const handleAction = async (type: "run" | "pause" | "resume" | "approve" | "dismiss", id: string) => {
     setActionLoading(id);
@@ -492,7 +493,7 @@ export function AgentCommandCenterClient({ agents: initialAgents, workload: init
             setAgents(data.agents);
             setWorkload(data.workload);
             if (selectedAgent) {
-              const updated = data.agents.find((a: AgentDefinition) => a.id === selectedAgent.id);
+              const updated = data.agents.find((a: AgentDefinitionWithRelations) => a.id === selectedAgent.id);
               if (updated) setSelectedAgent(updated);
             }
           }

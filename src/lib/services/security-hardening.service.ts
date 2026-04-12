@@ -178,10 +178,9 @@ export class CsrfProtection {
    * Validate that state-changing requests have the correct content type.
    * Prevents form-submission-based CSRF.
    */
-  static async validateContentType(): Promise<boolean> {
+  static async validateContentType(method: string): Promise<boolean> {
     const requestHeaders = await headers();
     const contentType = requestHeaders.get("content-type") ?? "";
-    const method = requestHeaders.get("x-method-override") ?? requestHeaders.get("x-http-method") ?? "";
 
     // Only validate for methods that change state
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {

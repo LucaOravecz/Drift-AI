@@ -1,25 +1,51 @@
 import { NextResponse } from "next/server";
+import Stripe from "stripe";
 import { BillingService } from "@/lib/services/billing.service";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
 
 /**
  * POST /api/stripe/webhook
  *
  * Handles Stripe webhook events for subscription management.
- * In production, verify the webhook signature using STRIPE_WEBHOOK_SECRET.
+ * Verifies the webhook signature using STRIPE_WEBHOOK_SECRET.
  */
 export async function POST(request: Request) {
   const body = await request.text();
-  const event = JSON.parse(body);
+  const sig = request.headers.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  // TODO: Verify Stripe webhook signature
-  // const sig = request.headers.get("stripe-signature");
-  // stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET)
+  let event: Stripe.Event;
+
+  if (webhookSecret && sig) {
+    // Production: verify signature
+    try {
+      event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    } catch (err) {
+      console.error("Stripe webhook signature verification failed:", err);
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
+  } else {
+    // Dev mode: parse without verification (webhook secret not configured)
+    if (process.env.NODE_ENV === "production") {
+      console.error("STRIPE_WEBHOOK_SECRET not set in production — rejecting webhook");
+      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+    }
+    event = JSON.parse(body);
+  }
 
   try {
     switch (event.type) {
-      case "checkout.session.completed":
-        await BillingService.handleCheckoutComplete(event.data.object);
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await BillingService.handleCheckoutComplete({
+          customer: (session.customer as string) ?? "",
+          subscription: (session.subscription as string) ?? "",
+          client_reference_id: session.client_reference_id ?? undefined,
+          metadata: session.metadata ?? undefined,
+        });
         break;
+      }
 
       case "customer.subscription.deleted":
         await BillingService.handleSubscriptionDeleted(event.data.object.id);
