@@ -1,0 +1,1051 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------
+// CORE ENTITIES
+// --------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  users            User[]
+  clients          Client[]
+  prospects        Prospect[]
+  logs             AuditLog[]
+  auditEvents      AuditEvent[]
+  campaigns        Campaign[]
+  flags            ComplianceFlag[]
+  settings         OrganizationSettings?
+  notifications    Notification[]
+  subscription     Subscription?
+  apiKeys          ApiKey[]
+  integrationConfs IntegrationConfig[]
+  complianceRules  ComplianceRule[]
+  outboundWebhooks OutboundWebhook[]
+  aiUsageRecords   AiUsageRecord[]
+  tags             Tag[]
+  agents           AgentDefinition[]
+  agentTasks       AgentTask[]
+  agentOutputs     AgentOutput[]
+  agentApprovals   AgentApproval[]
+
+  @@index([deletedAt])
+  @@map("organizations")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String       @unique
+  name           String?
+  passwordHash   String?
+  avatarUrl      String?
+  role           String       @default("ADVISOR")
+  isActive       Boolean      @default(true)
+  mustChangePassword Boolean  @default(false)
+  lastPasswordChangeAt DateTime?
+  deactivatedAt  DateTime?
+  mfaEnabled     Boolean      @default(false)
+  mfaSecret      String?
+  mfaRecoveryCodes String?
+  ssoProviderId  String?     // SAML/OIDC provider identifier
+  ssoProvider    String?     // GOOGLE, OKTA, AZURE_AD, ONELOGIN, etc.
+  // Institutional Roles: ADMIN, SENIOR_ADVISOR, ADVISOR, COMPLIANCE_OFFICER, ANALYST, READ_ONLY
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  logs           AuditLog[]
+  tasks          Task[]
+  flags          ComplianceFlag[]
+  approvedComms  Communication[] @relation("Approver")
+  sessions       UserSession[]
+  pendingLoginChallenges PendingLoginChallenge[]
+  invites        UserInvite[] @relation("InvitedUser")
+  sentInvites    UserInvite[] @relation("InviteSender")
+  preferences    UserPreference?
+  notifications  Notification[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([ssoProviderId])
+  @@map("users")
+}
+
+model OrganizationSettings {
+  id                 String       @id @default(cuid())
+  organizationId     String       @unique
+  brandName          String       @default("DRIFT OS")
+  brandShortName     String       @default("Drift")
+  productName        String       @default("Drift Intelligence Platform")
+  tagline            String       @default("AI Operating System for Financial Firms")
+  logoUrl            String?
+  accentColor        String       @default("#4f46e5")
+  customCss          String?      // Full CSS override for white-labeling
+  customEmailTemplate String?     // Handlebars template for email notifications
+  supportEmail       String?
+  notificationsEmail String?
+  appBaseUrl         String?
+  emailDeliveryWebhookUrl String?
+  calendarSyncWebhookUrl String?
+  // Per-firm compliance configuration
+  complianceConfig   Json?        // { riskyKeywords, reviewThresholds, escalationRules }
+  // Data retention & encryption
+  dataRetentionDays  Int          @default(2555) // 7 years default for SEC books-and-records
+  encryptionAtRest   Boolean      @default(true)
+  ipAllowlist        String?      // JSON array of CIDR ranges
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_settings")
+}
+
+model UserPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  timezone            String?
+  locale              String?
+  emailNotifications  Boolean  @default(true)
+  inAppNotifications  Boolean  @default(true)
+  weeklyDigest        Boolean  @default(false)
+  pushNotifications   Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     String
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  userAgent   String?
+  ipAddress   String?
+  ssoSessionId String?  // External SSO session reference
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model PendingLoginChallenge {
+  id         String   @id @default(cuid())
+  userId     String
+  token       String   @unique
+  purpose     String   @default("SIGN_IN")
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("pending_login_challenges")
+}
+
+model UserInvite {
+  id              String   @id @default(cuid())
+  userId          String
+  invitedByUserId String
+  email           String
+  token           String   @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation("InvitedUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy       User     @relation("InviteSender", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([expiresAt])
+  @@map("user_invites")
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  type           String       @default("SYSTEM")
+  title          String
+  body           String
+  link           String?
+  status         String       @default("UNREAD")
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
+}
+
+// --------------------------------------------------
+// CLIENT & CRM
+// --------------------------------------------------
+
+model Client {
+  id             String   @id @default(cuid())
+  organizationId String
+  householdId    String?  // Enterprise Household Grouping
+  type           String   @default("INDIVIDUAL") // INDIVIDUAL, HOUSEHOLD, ENTITY, TRUST
+  name           String
+  email          String?
+  phone          String?
+  riskProfile    String?
+  aum            Float?
+  churnScore     Int      @default(0)
+  lastContactAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  intelligence        IntelligenceProfile?
+  opportunities       Opportunity[]
+  events              LifeEvent[]
+  documents           Document[]
+  meetings            Meeting[]
+  taxInsights         TaxInsight[]
+  investInsights      InvestmentInsight[]
+  onboarding          OnboardingWorkflow?
+  communications      Communication[]
+  relationshipEvents  RelationshipEvent[]
+  researchMemos       ResearchMemo[]
+  tasks               Task[]
+  sentimentHistory    SentimentSnapshot[]
+  memorySnapshots     ClientMemorySnapshot[]
+  accounts            FinancialAccount[]
+  clientTags          ClientTag[]
+
+  @@index([organizationId])
+  @@index([householdId])
+  @@index([email])
+  @@index([deletedAt])
+  @@map("clients")
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  color          String   @default("#4f46e5")
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientTags     ClientTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+model ClientTag {
+  id         String   @id @default(cuid())
+  clientId   String
+  tagId      String
+  createdAt  DateTime @default(now())
+
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, tagId])
+  @@map("client_tags")
+}
+
+model IntelligenceProfile {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  familyContext   String?
+  communication   String?
+  concerns        String?
+  goals           String?
+  lifeStage       String?  // PRE_RETIREMENT, RETIREMENT, ACCUMULATION, DISTRIBUTION
+  riskNotes       String?
+  sentimentScore  Int      @default(80)
+  relationStrength Int     @default(70) // 0-100
+  lastUpdated     DateTime @default(now())
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("intelligence_profiles")
+}
+
+// Institutional Relationship Intelligence — Historical Sentiment Tracking
+model SentimentSnapshot {
+  id               String   @id @default(cuid())
+  clientId         String
+  sentimentScore   Int
+  relationStrength Int
+  churnScore       Int      @default(0)
+  trigger          String?  // COMMUNICATION_RECEIVED, MANUAL_SYNC, LIFE_EVENT
+  notes            String?
+  timestamp        DateTime @default(now())
+
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, timestamp])
+  @@map("sentiment_snapshots")
+}
+
+// --------------------------------------------------
+// REVENUE & OPPORTUNITY ENGINE (EXPLAINABLE)
+// --------------------------------------------------
+
+model Opportunity {
+  id              String   @id @default(cuid())
+  clientId        String
+  type            String   // IDLE_CASH, TLH, ROLLOVER, CROSS_SELL, REBALANCE, ESTATE, INSURANCE, REFERRAL
+  valueEst        Float?
+  confidence      Float    @default(70)
+  description     String
+  evidence        String?  // Data points used for trigger
+  reasoning       String?  // Explainable AI Step-by-step
+  suggestedAction String
+  draftOutreach   String?
+  status          String   @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED, EXECUTED
+  riskLevel       String   @default("LOW") // LOW, MEDIUM, HIGH
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@index([status])
+  @@map("opportunities")
+}
+
+// --------------------------------------------------
+// PROSPECTS / SALES PIPELINE
+// --------------------------------------------------
+
+model Prospect {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  email          String?
+  phone          String?
+  source         String?   // REFERRAL, WEBSITE, SEMINAR, COLD_OUTREACH, INBOUND
+  stage          String    @default("LEAD") // LEAD, QUALIFIED, DISCOVERY, PROPOSAL, NEGOTIATION, CLOSED_WON, CLOSED_LOST
+  score          Int       @default(50) // 0-100 lead score
+  estimatedAum   Float?
+  notes          String?
+  lastTouchAt    DateTime?
+  nextAction     String?
+  campaignId     String?
+  aiInsight      String?   // AI-generated insight about this prospect
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id])
+
+  @@index([organizationId, stage])
+  @@index([email])
+  @@map("prospects")
+}
+
+model Campaign {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  type           String    // EMAIL_SEQUENCE, SEMINAR, COLD_OUTREACH, NURTURE
+  status         String    @default("ACTIVE") // DRAFT, ACTIVE, PAUSED, COMPLETE
+  targetCount    Int       @default(0)
+  openRate       Float?
+  replyRate      Float?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  prospects      Prospect[]
+
+  @@index([organizationId, status])
+  @@map("campaigns")
+}
+
+// --------------------------------------------------
+// TAX & INVESTMENT INSIGHTS (EXPLAINABLE)
+// --------------------------------------------------
+
+model TaxInsight {
+  id              String   @id @default(cuid())
+  clientId        String
+  title           String
+  category        String?  // TLH, RMD, CHARITABLE, CONTRIBUTION, ESTIMATED_PAYMENT, ENTITY, BUNCHING
+  rationale       String
+  evidence        String?  // Data lineage
+  urgency         String   @default("MEDIUM")
+  riskLevel       String   @default("LOW") // LOW, MEDIUM, HIGH
+  confidence      Float    @default(80)
+  explanation     String?  // Step-by-step AI reasoning
+  estimatedImpact String?
+  suggestedAction String
+  status          String   @default("UNDER_REVIEW") // UNDER_REVIEW, PENDING_APPROVAL, ACCEPTED, DISMISSED, TASK_CREATED
+  draftNote       String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@index([status])
+  @@map("tax_insights")
+}
+
+model InvestmentInsight {
+  id              String   @id @default(cuid())
+  clientId        String
+  title           String
+  assetTicker     String?
+  thesis          String
+  risks           String?
+  catalysts       String?
+  questions       String?
+  confidence      Float    @default(75)
+  dataSources     String?  // Institutional data points used
+  status          String   @default("UNDER_REVIEW") // UNDER_REVIEW, PENDING_APPROVAL, REVIEWED, SAVED_MEMO, DISMISSED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@index([assetTicker])
+  @@map("investment_insights")
+}
+
+model ResearchMemo {
+  id              String   @id @default(cuid())
+  clientId        String?
+  title           String
+  assetOrSector   String?
+  thesis          String
+  risks           String
+  catalysts       String
+  questions       String?
+  sources         String?  // comma-separated sources
+  status          String   @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, ARCHIVED
+  generatedBy     String   @default("AI")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([status])
+  @@map("research_memos")
+}
+
+// --------------------------------------------------
+// ONBOARDING WORKFLOW
+// --------------------------------------------------
+
+model OnboardingWorkflow {
+  id          String   @id @default(cuid())
+  clientId    String   @unique
+  stage       String   @default("LEAD")
+  // LEAD, QUALIFICATION, DISCOVERY, INTAKE, DOCS_REQUESTED, DOCS_RECEIVED, REVIEW, PROPOSAL, SIGNED, ACCOUNT_SETUP, COMPLETE
+  healthScore Int      @default(100)
+  notes       String?
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  steps       OnboardingStep[]
+
+  @@map("onboarding_workflows")
+}
+
+model OnboardingStep {
+  id          String    @id @default(cuid())
+  workflowId  String
+  name        String
+  status      String    @default("PENDING") // PENDING, BLOCKED, COMPLETED, PENDING_APPROVAL
+  notes       String?
+  approverId  String?
+  completedAt DateTime?
+
+  workflow    OnboardingWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@map("onboarding_steps")
+}
+
+// --------------------------------------------------
+// DOCUMENTS (AUDITABLE)
+// --------------------------------------------------
+
+model Document {
+  id           String   @id @default(cuid())
+  clientId     String
+  fileName     String
+  fileSize     Int
+  documentType String?  // ESTATE_PLAN, TAX_RETURN, STATEMENT, TRUST_AGREEMENT, INSURANCE, FINANCIAL_PLAN
+  pageCount    Int?
+  status       String   @default("UPLOADED") // UPLOADED, QUEUED, PROCESSING, SUMMARIZED, REVIEWED
+  summaryText  String?
+  keyPoints    Json?    // Structured key points array
+  actionItems  Json?    // Structured action items array
+  riskItems    Json?    // Structured risk items array
+  deadlines    Json?    // Structured deadlines array
+  sourceRef    String?  // Data lineage reference
+  storagePath  String?  // S3/GCS object key for file storage
+  uploadedAt   DateTime @default(now())
+  deletedAt    DateTime?
+
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([documentType])
+  @@index([status])
+  @@map("documents")
+}
+
+// --------------------------------------------------
+// COMMUNICATIONS (GOVERNANCE)
+// --------------------------------------------------
+
+model Communication {
+  id              String   @id @default(cuid())
+  clientId        String
+  campaignId      String?
+  type            String   // EMAIL, MEETING_NOTE, PHONE, GIFT, MILESTONE_OUTREACH
+  direction       String   // INBOUND, OUTBOUND
+  subject         String?
+  body            String?
+  status          String   @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVED, SENT, REJECTED
+  approverId      String?
+  approvalComments String?
+  sentAt          DateTime?
+  timestamp       DateTime @default(now())
+  deletedAt       DateTime?
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  approver        User?    @relation("Approver", fields: [approverId], references: [id])
+
+  @@index([clientId, direction])
+  @@index([status])
+  @@index([timestamp])
+  @@map("communications")
+}
+
+// --------------------------------------------------
+// RELATIONSHIP ENGINE
+// --------------------------------------------------
+
+model RelationshipEvent {
+  id             String    @id @default(cuid())
+  clientId       String
+  type           String    // BIRTHDAY, ANNIVERSARY, MILESTONE, GIFT, CHECK_IN, REFERRAL_MOMENT
+  title          String
+  description    String?
+  eventDate      DateTime?
+  draftMessage   String?
+  status         String    @default("PENDING") // PENDING, OUTREACH_SENT, COMPLETED, DISMISSED
+  giftSuggestion String?
+  assignedTo     String?
+  createdAt      DateTime  @default(now())
+
+  client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, eventDate])
+  @@index([status])
+  @@map("relationship_events")
+}
+
+// --------------------------------------------------
+// EVENTS, TASKS & MEETINGS
+// --------------------------------------------------
+
+model LifeEvent {
+  id           String   @id @default(cuid())
+  clientId     String
+  title        String
+  type         String?  // RETIREMENT, BUSINESS_SALE, LIQUIDITY, INHERITANCE, RELOCATION, NEW_CHILD, EDUCATION
+  detectedFrom String?
+  implications String?
+  opportunity  String?
+  createdAt    DateTime @default(now())
+
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("life_events")
+}
+
+model Meeting {
+  id             String   @id @default(cuid())
+  clientId       String
+  title          String
+  type           String   @default("REVIEW") // REVIEW, INTRO, DISCOVERY, FOLLOWUP, TAX, PLANNING
+  scheduledAt    DateTime
+  status         String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  attendees      String?
+  briefGenerated Boolean  @default(false)
+  briefText      String?
+  notes          String?
+
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, scheduledAt])
+  @@index([scheduledAt])
+  @@map("meetings")
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  userId      String?
+  clientId    String?
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  source      String    @default("MANUAL") // MANUAL, AI_GENERATED, ONBOARDING, ALERT
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isCompleted])
+  @@index([clientId])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+// --------------------------------------------------
+// COMPLIANCE & AUDIT LOGS (INSTITUTIONAL)
+// --------------------------------------------------
+
+model ComplianceFlag {
+  id             String    @id @default(cuid())
+  organizationId String
+  type           String    // RISKY_WORDING, UNREVIEWED_DRAFT, STALE_RECOMMENDATION, MISSING_APPROVAL, UNAPPROVED_COMMUNICATION, REG_BI_VIOLATION, AD_RULE_VIOLATION
+  severity       String    @default("MEDIUM")
+  description    String
+  target         String    // Reference to what was flagged
+  targetId       String?
+  status         String    @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED, DISMISSED
+  reviewedBy     String?
+  resolvedAt     DateTime?
+  aiInvolved     Boolean   @default(false)
+  ruleId         String?   // Reference to the ComplianceRule that triggered this
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reviewer       User?        @relation(fields: [reviewedBy], references: [id])
+  rule           ComplianceRule? @relation(fields: [ruleId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([severity, status])
+  @@map("compliance_flags")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  target         String
+  details        String
+  aiInvolved     Boolean  @default(false)
+  severity       String   @default("INFO") // INFO, WARNING, CRITICAL
+  beforeState    Json?    // JSON snapshot before action
+  afterState     Json?    // JSON snapshot after action
+  metadata       Json?    // Additional context (IP, User Agent, Reasoning Trace)
+  timestamp      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, timestamp])
+  @@index([action])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model ClientMemorySnapshot {
+  id             String   @id @default(cuid())
+  clientId        String
+  generatedBy     String   @default("DETERMINISTIC")
+  dataQuality     String
+  summary         String
+  payload         Json     // Structured memory payload
+  missingData     Json?    // Structured missing data list
+  createdAt       DateTime @default(now())
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@map("client_memory_snapshots")
+}
+
+model FinancialAccount {
+  id                 String   @id @default(cuid())
+  clientId           String
+  accountName        String
+  accountType        String
+  custodian          String?
+  taxTreatment       String?
+  currentValue       Float    @default(0)
+  cashBalance        Float    @default(0)
+  targetEquities     Float?
+  targetFixedIncome  Float?
+  targetCash         Float?
+  targetAlternatives Float?
+  custodianExternalId String? // External ID from custodian integration
+  lastSyncedAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  client             Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  holdings           Holding[]
+
+  @@index([clientId])
+  @@index([custodian])
+  @@map("financial_accounts")
+}
+
+model Holding {
+  id              String   @id @default(cuid())
+  accountId       String
+  symbol          String
+  name            String
+  assetClass      String
+  quantity        Float    @default(0)
+  marketValue     Float
+  costBasis       Float?
+  weightPercent   Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  account         FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([symbol])
+  @@map("holdings")
+}
+
+// --------------------------------------------------
+// IMMUTABLE AUDIT EVENT LOG (APPEND-ONLY)
+// Regulatory requirement: SEC books-and-records must be immutable.
+// AuditLog above is mutable for operational use; AuditEvent is the
+// append-only, tamper-evident ledger for compliance and e-discovery.
+// --------------------------------------------------
+
+model AuditEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  target         String
+  targetId       String?
+  details        String
+  aiInvolved     Boolean  @default(false)
+  severity       String   @default("INFO") // INFO, WARNING, CRITICAL
+  beforeState    Json?
+  afterState     Json?
+  metadata       Json?    // { ip, userAgent, reasoningTrace, model, tokens }
+  eventHash      String   // SHA-256 hash of the event for tamper detection
+  previousHash   String?  // Chain to previous event for tamper-evident ledger
+  timestamp      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, timestamp])
+  @@index([action])
+  @@index([target, targetId])
+  @@map("audit_events")
+}
+
+// --------------------------------------------------
+// BILLING & SUBSCRIPTIONS
+// --------------------------------------------------
+
+model Subscription {
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  stripeCustomerId  String?  // Stripe customer ID
+  stripePriceId     String?  // Current Stripe price ID
+  stripeSubscriptionId String? // Stripe subscription ID
+  plan              String   @default("STARTER") // STARTER, PROFESSIONAL, ENTERPRISE
+  status            String   @default("TRIAL") // TRIAL, ACTIVE, PAST_DUE, CANCELED, UNPAID
+  seatCount         Int      @default(1)
+  trialEndsAt       DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd  DateTime?
+  canceledAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// --------------------------------------------------
+// API KEYS (DEVELOPER PLATFORM)
+// --------------------------------------------------
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String   // Human-readable label
+  keyHash        String   // SHA-256 hash of the API key (never store plaintext)
+  keyPrefix      String   // First 8 chars for identification (e.g., "drift_a1b2")
+  permissions    Json     // { "read": ["clients","opportunities"], "write": ["communications"] }
+  rateLimit      Int      @default(100) // Requests per minute
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean  @default(true)
+  createdBy      String?  // User ID who created the key
+  createdAt      DateTime @default(now())
+  revokedAt      DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([organizationId, isActive])
+  @@map("api_keys")
+}
+
+// --------------------------------------------------
+// INTEGRATION CONFIGURATIONS (PER-ORG)
+// --------------------------------------------------
+
+model IntegrationConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  provider       String   // SCHWAB, FIDELITY, PERSHING, TD_AMERITRADE, REDTAIL, WEALTHBOX, SALESFORCE_FSC, BLACK_DIAMOND, ORION, ADDEPAR, GOOGLE_CALENDAR, OUTLOOK_CALENDAR, SENDGRID, POSTMARK, SES, DOCUSIGN
+  category       String   // CUSTODIAN, PORTFOLIO_ACCOUNTING, CRM, CALENDAR, EMAIL_DELIVERY, E_SIGNATURE, MARKET_DATA
+  config         Json     // Provider-specific config (encrypted at app level, never plaintext)
+  status         String   @default("PENDING") // PENDING, ACTIVE, ERROR, DISCONNECTED
+  lastSyncAt     DateTime?
+  syncIntervalMinutes Int @default(60) // How often to sync
+  errorCount     Int      @default(0)
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@index([provider, status])
+  @@map("integration_configs")
+}
+
+// --------------------------------------------------
+// COMPLIANCE RULES (PER-FIRM CUSTOMIZATION)
+// --------------------------------------------------
+
+model ComplianceRule {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String    // Human-readable rule name
+  type           String    // RISKY_WORDING, ENGAGEMENT_LATENCY, STALE_DOCUMENT, REG_BI, AD_RULE, SUITABILITY, FIDUCIARY
+  category       String    // COMMUNICATION, DOCUMENT, ENGAGEMENT, REGULATION
+  config         Json      // Rule-specific config { keywords, thresholdDays, severity, autoEscalate }
+  isActive       Boolean   @default(true)
+  severity       String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  autoEscalate   Boolean   @default(false) // Auto-create task when triggered
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  flags          ComplianceFlag[]
+
+  @@index([organizationId, isActive])
+  @@index([type])
+  @@map("compliance_rules")
+}
+
+// --------------------------------------------------
+// OUTBOUND WEBHOOKS (EVENT-DRIVEN INTEGRATIONS)
+// --------------------------------------------------
+
+model OutboundWebhook {
+  id             String   @id @default(cuid())
+  organizationId String
+  url            String
+  events         Json     // Array of event types to subscribe to
+  secret         String   // HMAC secret for payload signing
+  isActive       Boolean  @default(true)
+  lastDeliveryAt DateTime?
+  failureCount   Int      @default(0)
+  lastFailure    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@map("outbound_webhooks")
+}
+
+// --------------------------------------------------
+// AI USAGE TRACKING (COST & BUDGET MANAGEMENT)
+// --------------------------------------------------
+
+model AiUsageRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  model          String   // claude-3-7-sonnet, claude-3-5-haiku, etc.
+  feature        String   // BRIEF_GENERATION, OUTREACH_DRAFT, COMPLIANCE_SCAN, etc.
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  costUsd        Float    @default(0)
+  latencyMs      Int?
+  success        Boolean  @default(true)
+  errorMessage   String?
+  requestId      String?  // Provider request ID for debugging
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([feature])
+  @@index([model])
+  @@map("ai_usage_records")
+}
+
+// --------------------------------------------------
+// AGENT ORCHESTRATION (MCP-CONNECTED AGENTS)
+// --------------------------------------------------
+
+model AgentDefinition {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String   // "Sales Agent", "Client Intelligence Agent", etc.
+  purpose         String   // Descriptive purpose
+  type            String   @default("AUTONOMOUS") // AUTONOMOUS, SCHEDULED, EVENT_TRIGGERED
+  status          String   @default("IDLE") // IDLE, RUNNING, PAUSED, ERROR, REVIEW_NEEDED
+  successRate     Float    @default(0) // 0-100
+  confidenceLevel Float    @default(0) // 0-100
+  outputsToday    Int      @default(0)
+  pendingReviews  Int      @default(0)
+  lastRun         DateTime?
+  lastError       String?
+  icon            String   @default("Zap") // Lucide icon name
+  colorClass      String   @default("text-blue-400") // Tailwind color
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks           AgentTask[]
+  outputs         AgentOutput[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("agent_definitions")
+}
+
+model AgentTask {
+  id              String   @id @default(cuid())
+  agentId         String
+  organizationId  String
+  description     String
+  type            String   @default("GENERAL") // SCAN, ANALYSIS, GENERATION, APPROVAL, etc.
+  status          String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, FAILED
+  priority        String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  input           String   @default("{}")
+  output          String?
+  error           String?
+  linkedClient    String?
+  linkedWorkflow  String?
+  linkedRecord    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agent           AgentDefinition @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("agent_tasks")
+}
+
+model AgentOutput {
+  id              String   @id @default(cuid())
+  agentId         String
+  organizationId  String
+  title           String
+  type            String   // BRIEF, INSIGHT, DRAFT, ALERT, REPORT, RECOMMENDATION
+  summary         String
+  content         String?
+  reviewStatus    String   @default("PENDING") // PENDING, APPROVED, DISMISSED, REJECTED
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  linkedClient    String?
+  linkedWorkflow  String?
+  linkedRecord    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agent           AgentDefinition @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  approvals       AgentApproval[]
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([reviewStatus])
+  @@index([createdAt])
+  @@map("agent_outputs")
+}
+
+model AgentApproval {
+  id              String   @id @default(cuid())
+  outputId        String
+  organizationId  String
+  approverUserId  String
+  decision        String   // APPROVED, DISMISSED, REJECTED
+  comments        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  output          AgentOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([outputId])
+  @@index([organizationId])
+  @@index([approverUserId])
+  @@map("agent_approvals")
+}

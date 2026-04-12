@@ -1,0 +1,136 @@
+export const mockMetrics = {
+  aum: "$824.5M",
+  aumChange: "+$12.4M (30d)",
+  activeClients: 142,
+  prospects: 28,
+  revenueOpportunities: "$420,000",
+  churnRisk: 3,
+};
+
+export const mockAlerts = [
+  {
+    id: "al-1",
+    title: "High Idle Cash",
+    description: "The Peterson Household is holding $400k+ in cash across accounts. Opportunity to deploy into fixed income.",
+    type: "opportunity",
+    severity: "high",
+    client: "Peterson Household",
+    date: "2h ago",
+  },
+  {
+    id: "al-2",
+    title: "Churn Risk Detected",
+    description: "Sarah Jenkins hasn't logged into the portal in 9 months. Sentiment score decreased in last email.",
+    type: "risk",
+    severity: "critical",
+    client: "Sarah Jenkins",
+    date: "5h ago",
+  },
+  {
+    id: "al-3",
+    title: "Tax-Loss Harvesting",
+    description: "Tech sector pullback created a $45k TLH opportunity in the Williams Trust account.",
+    type: "tax",
+    severity: "medium",
+    client: "Williams Trust",
+    date: "1d ago",
+  },
+  {
+    id: "al-4",
+    title: "Life Event Reminder",
+    description: "Client Michael Chang is turning 65 in 3 months. Medicare and RMD planning required.",
+    type: "event",
+    severity: "high",
+    client: "Michael Chang",
+    date: "2d ago",
+  },
+];
+
+export const mockRevenueEngine = [
+  {
+    id: "opp-1",
+    type: "Idle Cash",
+    client: "Dr. Amanda Reyes",
+    value: "$1.2M",
+    confidence: 95,
+    suggestedAction: "Propose high-yield municipal bond strategy",
+  },
+  {
+    id: "opp-2",
+    type: "401k Rollover",
+    client: "James & Elaine Smith",
+    value: "$850k",
+    confidence: 80,
+    suggestedAction: "James recently retired. Discuss consolidating legacy 401k plans.",
+  },
+  {
+    id: "opp-3",
+    type: "Estate Planning Cross-sell",
+    client: "The Harrison Family",
+    value: "Referral + Trust",
+    confidence: 65,
+    suggestedAction: "Business sale event matched. Likely needs advanced estate strategies.",
+  },
+];
+
+export const mockClients = [
+  {
+    id: "c-1",
+    name: "Peterson Household",
+    type: "Household",
+    aum: "$4.2M",
+    status: "Active",
+    lastContact: "12 days ago",
+    risk: "Moderate Growth",
+    nextReview: "Oct 12",
+  },
+  {
+    id: "c-2",
+    name: "Sarah Jenkins",
+    type: "Individual",
+    aum: "$850k",
+    status: "Active",
+    lastContact: "9 months ago",
+    risk: "Conservative",
+    nextReview: "Needs Scheduling",
+  },
+  {
+    id: "c-3",
+    name: "Dr. Amanda Reyes",
+    type: "Individual",
+    aum: "$6.8M",
+    status: "Active",
+    lastContact: "2 days ago",
+    risk: "Aggressive",
+    nextReview: "Nov 5",
+  },
+  {
+    id: "c-4",
+    name: "Williams Trust",
+    type: "Entity",
+    aum: "$12.4M",
+    status: "Active",
+    lastContact: "3 weeks ago",
+    risk: "Balanced",
+    nextReview: "Dec 1",
+  },
+  {
+    id: "c-5",
+    name: "The Harrison Family",
+    type: "Household",
+    aum: "$21.5M",
+    status: "Active",
+    lastContact: "1 month ago",
+    risk: "Growth",
+    nextReview: "Sep 20",
+  },
+];
+
+export const mockChartData = [
+  { month: "Jan", aum: 780, revenue: 4.2 },
+  { month: "Feb", aum: 795, revenue: 4.3 },
+  { month: "Mar", aum: 810, revenue: 4.5 },
+  { month: "Apr", aum: 805, revenue: 4.4 },
+  { month: "May", aum: 815, revenue: 4.6 },
+  { month: "Jun", aum: 824.5, revenue: 4.8 },
+];
