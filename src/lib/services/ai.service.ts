@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import prisma from '@/lib/db'
 import { createHash } from 'crypto'
 
@@ -9,9 +8,9 @@ import { createHash } from 'crypto'
 type ModelTier = 'flagship' | 'standard' | 'economy'
 
 const MODEL_MAP: Record<ModelTier, string> = {
-  flagship: 'claude-3-7-sonnet-20250219',
-  standard: 'claude-3-5-sonnet-20241022',
-  economy:  'claude-3-5-haiku-20241022',
+  flagship: 'meta-llama/llama-3.1-8b-instruct',
+  standard: 'meta-llama/llama-3.1-8b-instruct',
+  economy:  'meta-llama/llama-3.1-8b-instruct',
 }
 
 const DEFAULT_TIER: ModelTier = 'standard'
@@ -19,15 +18,59 @@ const MAX_RETRIES = 3
 const BASE_BACKOFF_MS = 500
 
 // ---------------------------------------------------------------------------
-// Client singleton
+// OpenRouter client singleton
 // ---------------------------------------------------------------------------
 
-let _client: Anthropic | null = null
-function getClient(): Anthropic {
-  if (!_client) {
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+interface OpenRouterMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+interface OpenRouterResponse {
+  id: string
+  choices: {
+    message: {
+      content: string
+    }
+  }[]
+  usage: {
+    prompt_tokens: number
+    completion_tokens: number
   }
-  return _client
+}
+
+async function callOpenRouter(
+  model: string,
+  messages: OpenRouterMessage[],
+  maxTokens: number,
+): Promise<OpenRouterResponse> {
+  const apiKey = process.env.OPENROUTER_API_KEY
+  console.log('OpenRouter API Key loaded:', apiKey ? 'YES' : 'NO (MISSING)')
+  console.log('API Key preview:', apiKey ? `${apiKey.substring(0, 15)}...` : 'NONE')
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://driftai.app',
+      'X-Title': 'Drift AI',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+    }),
+  })
+
+  console.log('OpenRouter Response Status:', response.status)
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`OpenRouter API error: ${response.status} - ${error}`)
+  }
+
+  return response.json() as Promise<OpenRouterResponse>
 }
 
 // ---------------------------------------------------------------------------
@@ -35,13 +78,11 @@ function getClient(): Anthropic {
 // ---------------------------------------------------------------------------
 
 const COST_PER_MILLION: Record<string, { input: number; output: number }> = {
-  'claude-3-7-sonnet-20250219': { input: 3, output: 15 },
-  'claude-3-5-sonnet-20241022':  { input: 3, output: 15 },
-  'claude-3-5-haiku-20241022':   { input: 0.8, output: 4 },
+  'meta-llama/llama-3.1-8b-instruct': { input: 0, output: 0 }, // Free on OpenRouter
 }
 
 function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const rates = COST_PER_MILLION[model] ?? COST_PER_MILLION['claude-3-5-sonnet-20241022']
+  const rates = COST_PER_MILLION[model] ?? { input: 0, output: 0 }
   return (inputTokens * rates.input + outputTokens * rates.output) / 1_000_000
 }
 
@@ -81,11 +122,10 @@ async function recordUsage(params: {
 // Retry with exponential backoff
 // ---------------------------------------------------------------------------
 
-type RetryableError = Anthropic.APIError
-
-function isRetryable(err: unknown): err is RetryableError {
-  if (err instanceof Anthropic.APIError) {
-    return err.status === 429 || err.status === 500 || err.status === 502 || err.status === 503
+function isRetryable(err: unknown): boolean {
+  if (err instanceof Error) {
+    const message = err.message.toLowerCase()
+    return message.includes('429') || message.includes('500') || message.includes('502') || message.includes('503')
   }
   return false
 }
@@ -138,15 +178,11 @@ function resolveModel(feature: FeatureRoute, override?: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Structured output via tool_use (replaces regex JSON parsing)
+// JSON schema to instruction string
 // ---------------------------------------------------------------------------
 
-function buildJsonTool<T>(schema: Record<string, unknown>) {
-  return {
-    name: 'structured_output',
-    description: 'Return structured data matching the provided schema.',
-    input_schema: schema as Anthropic.Tool.InputSchema,
-  } satisfies Anthropic.Tool
+function schemaToInstructions(schema: Record<string, unknown>): string {
+  return JSON.stringify(schema, null, 2)
 }
 
 // ---------------------------------------------------------------------------
@@ -176,26 +212,17 @@ export async function callClaude(
   let requestId: string | undefined
 
   try {
-    const message = await withRetry(() =>
-      getClient().messages.create({
-        model,
-        max_tokens: maxTokens,
-        ...(options.thinkingBudget ? {
-          thinking: { type: 'enabled', budget_tokens: options.thinkingBudget },
-        } : {}),
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
+    const response = await withRetry(() =>
+      callOpenRouter(model, [
+        { role: 'user', content: `${systemPrompt}\n\n${userMessage}` },
+      ], maxTokens),
     )
 
-    inputTokens = message.usage.input_tokens
-    outputTokens = message.usage.output_tokens
-    requestId = message.id
+    inputTokens = response.usage.prompt_tokens
+    outputTokens = response.usage.completion_tokens
+    requestId = response.id
 
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map(b => b.text)
-      .join('')
+    const text = response.choices[0]?.message.content ?? ''
 
     await recordUsage({
       organizationId: options.organizationId,
@@ -211,7 +238,6 @@ export async function callClaude(
 
     return text
   } catch (err) {
-    const apiErr = err as Anthropic.APIError | null
     await recordUsage({
       organizationId: options.organizationId,
       userId: options.userId,
@@ -221,15 +247,15 @@ export async function callClaude(
       outputTokens: 0,
       latencyMs: Date.now() - startMs,
       success: false,
-      errorMessage: apiErr?.message ?? String(err),
-      requestId: apiErr?.headers?.['request-id'],
+      errorMessage: err instanceof Error ? err.message : String(err),
+      requestId,
     })
     throw err
   }
 }
 
 // ---------------------------------------------------------------------------
-// Public API — callClaudeStructured (JSON via tool_use, no regex)
+// Public API — callClaudeStructured (JSON parsing)
 // ---------------------------------------------------------------------------
 
 export interface CallClaudeStructuredOptions<T> extends CallClaudeOptions {
@@ -244,35 +270,36 @@ export async function callClaudeStructured<T>(
   const model = resolveModel(options.feature ?? 'GENERAL', options.modelOverride)
   const maxTokens = options.maxTokens ?? 4096
   const startMs = Date.now()
-  const tool = buildJsonTool<T>(options.schema)
 
   let inputTokens = 0
   let outputTokens = 0
   let requestId: string | undefined
 
   try {
-    const message = await withRetry(() =>
-      getClient().messages.create({
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        tools: [tool],
-        tool_choice: { type: 'tool', name: tool.name },
-        messages: [{ role: 'user', content: userMessage }],
-      }),
+    const schemaInstructions = schemaToInstructions(options.schema)
+    const enhancedPrompt = `${systemPrompt}\n\nIMPORTANT: Return ONLY valid JSON. No markdown, no code blocks, no explanations, no extra text.\nRequired schema:\n${schemaInstructions}\n\nStart with { or [ and end with } or ]. Output valid JSON only.`
+
+    const response = await withRetry(() =>
+      callOpenRouter(model, [
+        { role: 'user', content: `${enhancedPrompt}\n\n${userMessage}` },
+      ], maxTokens),
     )
 
-    inputTokens = message.usage.input_tokens
-    outputTokens = message.usage.output_tokens
-    requestId = message.id
+    inputTokens = response.usage.prompt_tokens
+    outputTokens = response.usage.completion_tokens
+    requestId = response.id
 
-    const toolBlock = message.content.find(
-      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === tool.name,
-    )
+    const text = response.choices[0]?.message.content ?? ''
+    const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
 
-    if (!toolBlock) {
-      throw new Error('Claude did not return structured output via tool_use')
+    // Try to extract JSON if it's wrapped in text
+    let jsonText = cleaned
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/)
+    if (jsonMatch) {
+      jsonText = jsonMatch[0]
     }
+
+    const result = JSON.parse(jsonText) as T
 
     await recordUsage({
       organizationId: options.organizationId,
@@ -286,9 +313,8 @@ export async function callClaudeStructured<T>(
       requestId,
     })
 
-    return toolBlock.input as T
+    return result
   } catch (err) {
-    const apiErr = err as Anthropic.APIError | null
     await recordUsage({
       organizationId: options.organizationId,
       userId: options.userId,
@@ -298,8 +324,8 @@ export async function callClaudeStructured<T>(
       outputTokens: 0,
       latencyMs: Date.now() - startMs,
       success: false,
-      errorMessage: apiErr?.message ?? String(err),
-      requestId: apiErr?.headers?.['request-id'],
+      errorMessage: err instanceof Error ? err.message : String(err),
+      requestId,
     })
     throw err
   }
@@ -331,7 +357,7 @@ export async function callClaudeJSON<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Public API — Streaming
+// Public API — Streaming (non-streaming fallback for OpenRouter)
 // ---------------------------------------------------------------------------
 
 export interface StreamCallbacks {
@@ -352,36 +378,30 @@ export async function streamClaude(
   let fullText = ''
 
   try {
-    const stream = getClient().messages.stream({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    })
+    const response = await withRetry(() =>
+      callOpenRouter(model, [
+        { role: 'user', content: `${systemPrompt}\n\n${userMessage}` },
+      ], maxTokens),
+    )
 
-    stream.on('text', (text) => {
-      fullText += text
-      callbacks.onToken?.(text)
-    })
-
-    const finalMessage = await stream.finalMessage()
+    fullText = response.choices[0]?.message.content ?? ''
+    callbacks.onToken?.(fullText)
+    callbacks.onComplete?.(fullText)
 
     await recordUsage({
       organizationId: options.organizationId,
       userId: options.userId,
       model,
       feature: options.feature ?? 'GENERAL',
-      inputTokens: finalMessage.usage.input_tokens,
-      outputTokens: finalMessage.usage.output_tokens,
+      inputTokens: response.usage.prompt_tokens,
+      outputTokens: response.usage.completion_tokens,
       latencyMs: Date.now() - startMs,
       success: true,
-      requestId: finalMessage.id,
+      requestId: response.id,
     })
 
-    callbacks.onComplete?.(fullText)
     return fullText
   } catch (err) {
-    const apiErr = err as Anthropic.APIError | null
     await recordUsage({
       organizationId: options.organizationId,
       userId: options.userId,
@@ -391,7 +411,7 @@ export async function streamClaude(
       outputTokens: 0,
       latencyMs: Date.now() - startMs,
       success: false,
-      errorMessage: apiErr?.message ?? String(err),
+      errorMessage: err instanceof Error ? err.message : String(err),
     })
     const wrapped = err instanceof Error ? err : new Error(String(err))
     callbacks.onError?.(wrapped)

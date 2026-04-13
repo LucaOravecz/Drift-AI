@@ -35,7 +35,7 @@ interface TopHeaderProps {
 
 export function TopHeader({ branding, currentUser, summary, notifications, unreadCount }: TopHeaderProps) {
   return (
-    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.04] bg-[#09090b]/80 backdrop-blur-2xl px-5 supports-[backdrop-filter]:bg-[#09090b]/60">
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-zinc-700 bg-zinc-950 px-5">
       <SidebarTrigger className="text-zinc-500 hover:text-zinc-200 transition-colors" />
 
       <div className="flex h-5 items-center gap-2 px-2 md:px-0">

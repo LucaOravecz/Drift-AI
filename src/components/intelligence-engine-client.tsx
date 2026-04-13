@@ -11,11 +11,11 @@ import { useVisualization, VisualizationRenderer } from "@/lib/hooks/useVisualiz
 
 const container: Variants = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
 };
 const item: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 380, damping: 30 } },
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.3 } },
 };
 
 const REASONING_AREAS = [
@@ -209,9 +209,9 @@ export function IntelligenceEngineClient({ summary, alerts = [], revenueDrafts =
             <p className="text-sm text-muted-foreground">Proprietary reasoning layer — financial advisory, tax, wealth operations, client intelligence</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono text-emerald-400">ENGINE ACTIVE</span>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="text-xs font-medium text-emerald-400">ENGINE ACTIVE</span>
             </div>
           </div>
         </div>

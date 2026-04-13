@@ -33,9 +33,9 @@ export class AuditService {
           details: ctx.details ?? (typeof ctx.afterState === 'object' 
             ? JSON.stringify(ctx.afterState) 
             : String(ctx.afterState || ctx.action)),
-          beforeState: ctx.beforeState ? JSON.stringify(ctx.beforeState) : null,
-          afterState: ctx.afterState ? JSON.stringify(ctx.afterState) : null,
-          metadata: ctx.metadata ? JSON.stringify(ctx.metadata) : null,
+          beforeState: ctx.beforeState ? JSON.stringify(ctx.beforeState) as any : undefined,
+          afterState: ctx.afterState ? JSON.stringify(ctx.afterState) as any : undefined,
+          metadata: ctx.metadata ? JSON.stringify(ctx.metadata) as any : undefined,
           aiInvolved: ctx.aiInvolved ?? false,
           severity: ctx.severity ?? 'INFO',
         }
@@ -71,6 +71,6 @@ export class AuditService {
   static async getDecisionTrace(logId: string) {
     const log = await prisma.auditLog.findUnique({ where: { id: logId } })
     if (!log || !log.metadata) return null
-    return JSON.parse(log.metadata)
+    return JSON.parse(String(log.metadata))
   }
 }

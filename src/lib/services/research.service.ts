@@ -96,7 +96,7 @@ Return JSON with these exact fields:
   "sources": "List the specific data fields used from the client profile"
 }`
 
-        const text = await callClaude(systemPrompt, userMessage, 2048)
+        const text = await callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: orgId })
 
         // Extract JSON
         const jsonMatch = text.match(/\{[\s\S]*\}/)

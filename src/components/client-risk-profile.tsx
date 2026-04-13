@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Shield, AlertTriangle } from 'lucide-react'
 
 interface RiskMetrics {
+  [key: string]: unknown
   marketRisk: number // 0-10 scale
   concentrationRisk: number
   liquidityRisk: number
@@ -70,7 +71,7 @@ export function ClientRiskProfile({
           error={error}
           fallback={
             <div className="space-y-3">
-              {(Object.entries(riskMetrics) as [keyof RiskMetrics, number][]).map(([metric, score]) => {
+              {(Object.entries(riskMetrics) as [string, number][]).filter(([,v]) => typeof v === 'number').map(([metric, score]) => {
                 const metricLabel = metric
                   .replace('Risk', '')
                   .replace(/([A-Z])/g, ' $1')

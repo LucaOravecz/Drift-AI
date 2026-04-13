@@ -6,7 +6,7 @@ export type VisualizationType = 'allocation' | 'performance' | 'timeline' | 'ris
 
 interface UseVisualizationOptions {
   type: VisualizationType
-  data: Record<string, unknown>
+  data: Record<string, unknown> | unknown[]
   title?: string
   clientName?: string
 }

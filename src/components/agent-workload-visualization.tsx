@@ -40,7 +40,6 @@ export function AgentWorkloadVisualization({ workload }: AgentWorkloadVisualizat
     type: 'chart',
     data: chartData,
     title: 'Agent Workload Distribution',
-    description: 'Current status of all 9 agents across the workforce',
   })
 
   return (

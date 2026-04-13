@@ -106,7 +106,7 @@ No generic advice. Reference the client data. Start directly with the insight.`
           const result = await callClaudeJSON<{ rationale: string; play: string }>(
             systemPrompt,
             JSON.stringify(clientData),
-            512
+            { maxTokens: 512, organizationId: orgId }
           )
 
           affectedClients.push({

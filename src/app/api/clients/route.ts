@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
-// import prisma from "@/lib/prisma";
+import prisma from "@/lib/db";
 
 export async function GET(request: Request) {
   try {
-    /* 
-    TODO FOR DEVELOPER:
-    const { searchParams } = new URL(request.url)
-    const orgId = searchParams.get("organizationId")
-    
+    const { searchParams } = new URL(request.url);
+    const orgId = searchParams.get("organizationId");
+
+    if (!orgId) {
+      return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
+    }
+
     const clients = await prisma.client.findMany({
       where: { organizationId: orgId },
-      include: { intelligence: true }
+      include: { intelligence: true },
     });
     return NextResponse.json(clients);
-    */
-
-    return NextResponse.json({ message: "API Stub: Implement Prisma query here." }, { status: 200 });
   } catch (error) {
+    console.error("Failed to fetch clients:", error);
     return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
   }
 }
@@ -24,25 +24,24 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
-    /*
-    TODO FOR DEVELOPER:
+
+    if (!body.organizationId || !body.name) {
+      return NextResponse.json({ error: "organizationId and name are required" }, { status: 400 });
+    }
+
     const newClient = await prisma.client.create({
       data: {
         organizationId: body.organizationId,
         name: body.name,
-        type: body.type,
-      }
+        type: body.type || "INDIVIDUAL",
+        aum: body.aum || 0,
+        riskProfile: body.riskProfile || "MODERATE",
+      },
     });
 
-    // Fire off async hook to generate initial AI intelligence profile
-    // await queueIntelligenceScan(newClient.id);
-
-    return NextResponse.json(newClient);
-    */
-
-    return NextResponse.json({ message: "API Stub: Client Creation", received: body }, { status: 201 });
+    return NextResponse.json(newClient, { status: 201 });
   } catch (error) {
+    console.error("Failed to create client:", error);
     return NextResponse.json({ error: "Failed to create client" }, { status: 500 });
   }
 }

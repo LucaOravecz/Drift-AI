@@ -129,7 +129,7 @@ export class GipsPerformanceService {
     // Weight each cash flow by the fraction of the period remaining
     const weightedCashFlows = cashFlows.reduce((sum, cf) => {
       const daysRemaining = periodDays - Math.floor(
-        (cf.date.getTime() - cashFlows[0]?.date.getTime() ?? 0) / (1000 * 60 * 60 * 24),
+        (cf.date.getTime() - (cashFlows[0]?.date.getTime() ?? 0)) / (1000 * 60 * 60 * 24),
       );
       const weight = Math.max(0, daysRemaining / periodDays);
       return sum + cf.amount * weight;
@@ -307,7 +307,7 @@ export class GipsPerformanceService {
       where: {
         client: { organizationId },
         accountType: "DISCRETIONARY",
-        status: "ACTIVE",
+        deletedAt: null,
       },
       include: { holdings: true, client: { select: { name: true } } },
     });

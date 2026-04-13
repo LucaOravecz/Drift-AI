@@ -346,14 +346,14 @@ export class PortfolioRebalancingService {
     for (const account of accounts) {
       for (const holding of account.holdings) {
         const gainLoss = (holding.marketValue ?? 0) - (holding.costBasis ?? 0);
-        const acquireDate = holding.acquireDate ?? new Date();
+        const acquireDate = holding.createdAt ?? new Date();
         const daysHeld = Math.floor(
           (Date.now() - acquireDate.getTime()) / (1000 * 60 * 60 * 24),
         );
 
         lots.push({
           id: holding.id,
-          ticker: holding.ticker,
+          ticker: holding.symbol,
           quantity: holding.quantity,
           costBasis: holding.costBasis ?? 0,
           marketValue: holding.marketValue ?? 0,
@@ -447,7 +447,7 @@ export class PortfolioRebalancingService {
     userId?: string,
   ) {
     const existing = await prisma.complianceRule.findFirst({
-      where: { organizationId, category: "MODEL_PORTFOLIO", ruleName: name },
+      where: { organizationId, category: "MODEL_PORTFOLIO", name },
     });
 
     const config = { name, allocations: model } as any;
@@ -461,8 +461,9 @@ export class PortfolioRebalancingService {
       await prisma.complianceRule.create({
         data: {
           organizationId,
+          type: "MODEL_PORTFOLIO",
           category: "MODEL_PORTFOLIO",
-          ruleName: name,
+          name,
           severity: "INFO",
           config,
         },
@@ -491,7 +492,7 @@ export class PortfolioRebalancingService {
     });
 
     return rules.map((r) => {
-      const config = r.config as { name: string; allocations: ModelAllocation[] };
+      const config = r.config as unknown as { name: string; allocations: ModelAllocation[] };
       return {
         id: r.id,
         name: config.name,

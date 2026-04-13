@@ -59,7 +59,7 @@ export class ApiKeyService {
         name: params.name,
         keyHash,
         keyPrefix,
-        permissions: params.permissions ?? { read: ["clients", "opportunities", "tax_insights"] },
+        permissions: (params.permissions ?? { read: ["clients", "opportunities", "tax_insights"] }) as any,
         rateLimit: params.rateLimit ?? 100,
         expiresAt: params.expiresAt,
         createdBy: params.createdBy,
@@ -99,8 +99,8 @@ export class ApiKeyService {
 
     const keyHash = createHash("sha256").update(bearerToken).digest("hex");
 
-    const apiKey = await prisma.apiKey.findUnique({
-      where: { keyHash },
+    const apiKey = await prisma.apiKey.findFirst({
+      where: { keyHash, isActive: true },
       select: {
         id: true,
         organizationId: true,

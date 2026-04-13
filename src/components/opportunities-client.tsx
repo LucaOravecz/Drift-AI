@@ -216,10 +216,9 @@ export function OpportunitiesClient({ opportunities }: { opportunities: Opportun
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             
             {isPending ? (
-              <div className="text-center p-6 max-w-sm flex flex-col items-center relative z-10 animate-in fade-in duration-500">
-                <div className="relative flex items-center justify-center mb-6">
-                  <div className="absolute w-24 h-24 bg-primary/20 rounded-full blur-2xl animate-pulse" />
-                  <Loader2 className="h-8 w-8 text-white/50 animate-spin relative z-10" />
+              <div className="text-center p-6 max-w-sm flex flex-col items-center relative z-10">
+                <div className="flex items-center justify-center mb-6">
+                  <Loader2 className="h-8 w-8 text-white/50 animate-spin" />
                 </div>
                 <h3 className="font-medium text-lg text-white/90">Deep Context Scan...</h3>
                 <div className="mt-4 h-6">

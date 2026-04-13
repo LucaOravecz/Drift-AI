@@ -25,7 +25,8 @@ export class DocumentService {
     fileName: string,
     documentType: string,
     clientName: string,
-    documentContent?: string
+    documentContent: string | undefined,
+    orgId: string
   ): Promise<{
     keyPoints: string[]
     actionItems: string[]
@@ -57,7 +58,7 @@ Extract 3-5 key facts, 3-5 action items, and 2-3 risks. Be specific to the actua
         keyPoints: string[]
         actionItems: string[]
         riskItems: string[]
-      }>(systemPrompt, userMessage, 2048)
+      }>(systemPrompt, userMessage, { maxTokens: 2048, organizationId: orgId })
 
       return {
         keyPoints: (result.keyPoints ?? []).slice(0, 5),
@@ -238,7 +239,8 @@ Extract 3-5 key facts, 3-5 action items, and 2-3 risks. Be specific to the actua
       doc.fileName,
       doc.documentType ?? '',
       doc.client.name,
-      documentContent
+      documentContent,
+      orgId
     )
 
     const summary =
@@ -341,7 +343,7 @@ What document type is this most likely to be?`;
         type: string;
         confidence: number;
         reasoning: string;
-      }>(systemPrompt, userMessage, 256);
+      }>(systemPrompt, userMessage, { maxTokens: 256, organizationId: 'system' });
 
       return {
         type: result.type || 'OTHER',
@@ -377,7 +379,8 @@ What document type is this most likely to be?`;
       fileName,
       documentType,
       clientName,
-      documentContent
+      documentContent,
+      'system'
     )
     
     return {

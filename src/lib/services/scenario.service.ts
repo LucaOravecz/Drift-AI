@@ -133,7 +133,7 @@ Advisory Timeline: ${input.timelineMonths} months`
         plays: StrategicPlay[]
         riskOfInaction: string
         immediateNextStep: string
-      }>(systemPrompt, userMessage, 2048)
+      }>(systemPrompt, userMessage, { maxTokens: 2048, organizationId: client.organizationId })
 
       plays = result.plays ?? []
       riskOfInaction = result.riskOfInaction ?? ''

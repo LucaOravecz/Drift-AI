@@ -134,17 +134,17 @@ export class DataWarehouseService {
     const advisors = await prisma.user.findMany({
       where: { organizationId, role: { in: ["ADVISOR", "SENIOR_ADVISOR"] }, isActive: true },
       include: {
-        opportunities: true,
       },
     });
 
-    return advisors.map((advisor) => {
-      const totalOpps = advisor.opportunities?.length ?? 0;
-      const convertedOpps = advisor.opportunities?.filter((o) => o.status === "APPROVED").length ?? 0;
+    return Promise.all(advisors.map(async (advisor) => {
+      const opps = await prisma.opportunity.findMany({ where: { clientId: { in: (await prisma.client.findMany({ where: { organizationId } })).map(c => c.id) } } });
+      const totalOpps = opps.length;
+      const convertedOpps = opps.filter((o) => o.status === "APPROVED").length;
 
       return {
         advisorId: advisor.id,
-        advisorName: advisor.name,
+        advisorName: advisor.name ?? "Unknown",
         totalClients: 0, // TODO: Count from client assignments
         totalAum: 0, // TODO: Sum from assigned clients
         revenueGenerated: 0,
@@ -153,7 +153,7 @@ export class DataWarehouseService {
         conversionRate: totalOpps > 0 ? Math.round((convertedOpps / totalOpps) * 100) : 0,
         averageClientSatisfaction: 0,
       };
-    });
+    }));
   }
 
   /**

@@ -183,7 +183,7 @@ export class RegulatoryReportingService {
       prisma.auditLog.count({ where: { organizationId } }),
       prisma.complianceFlag.count({ where: { organizationId } }),
       prisma.communication.count({
-        where: { organizationId: undefined }, // Need client-based filter
+        where: { client: { organizationId } },
       }),
       prisma.user.count({ where: { organizationId, isActive: true } }),
     ]);

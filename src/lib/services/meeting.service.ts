@@ -88,7 +88,7 @@ IMPORTANT: Only reference facts listed above. Do not add any information not pre
         const result = await callClaudeJSON<{ talkingPoints: string[]; suggestedQuestions: string[] }>(
           systemPrompt,
           userMessage,
-          2048
+          { maxTokens: 2048, organizationId: meeting.client.organizationId }
         )
         aiTalkingPoints = result.talkingPoints?.slice(0, 5) ?? null
         aiFollowUpQuestions = result.suggestedQuestions?.slice(0, 5) ?? null

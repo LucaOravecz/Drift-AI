@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { BillingService } from "@/lib/services/billing.service";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
 
 /**
  * POST /api/stripe/webhook
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   if (webhookSecret && sig) {
     // Production: verify signature
     try {
-      event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+      event = getStripe().webhooks.constructEvent(body, sig, webhookSecret);
     } catch (err) {
       console.error("Stripe webhook signature verification failed:", err);
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });

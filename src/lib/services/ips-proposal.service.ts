@@ -257,6 +257,7 @@ export class IPSProposalService {
     );
 
     const missingData: string[] = [];
+    const currentAllocation = this.calculateCurrentAllocation(client.accounts);
     if (!client.riskProfile) missingData.push("Risk profile not assessed");
     if (!client.intelligence?.goals) missingData.push("Investment goals not recorded");
     if (totalAum === 0) missingData.push("No portfolio data — proposal will show model allocation only");

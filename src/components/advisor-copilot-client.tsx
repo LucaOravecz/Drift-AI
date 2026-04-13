@@ -49,15 +49,15 @@ function sectionBorderColor(type: CopilotResponseSection["type"]) {
 function ResponseSection({ section }: { section: CopilotResponseSection }) {
   const isArray = Array.isArray(section.content)
   return (
-    <div className={`border-l-2 pl-3 py-1.5 rounded-r-sm ${sectionBorderColor(section.type)}`}>
-      <div className="flex items-start gap-1.5 mb-1">
+    <div className={`border-l-2 pl-4 py-3 rounded-r-sm ${sectionBorderColor(section.type)}`}>
+      <div className="flex items-start gap-2 mb-2">
         <SectionIcon type={section.type} />
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {section.label}
         </span>
       </div>
       {isArray ? (
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {(section.content as string[]).map((item, i) => (
             <li key={i} className="text-sm text-foreground flex items-start gap-1.5">
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
@@ -206,7 +206,7 @@ function AssistantMessage({ msg, onRetry }: { msg: Message; onRetry: (prompt: st
     return (
       <div className="flex gap-3">
         <div className="h-7 w-7 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
-          <Bot className="h-3.5 w-3.5 text-primary animate-pulse" />
+          <Bot className="h-3.5 w-3.5 text-primary" />
         </div>
         <div className="flex-1 rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -361,7 +361,7 @@ export function AdvisorCopilotClient() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="h-2 w-2 rounded-full bg-emerald-500" />
             <span className="text-xs text-muted-foreground">Live</span>
           </div>
         </div>

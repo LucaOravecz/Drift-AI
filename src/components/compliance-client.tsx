@@ -150,8 +150,8 @@ export function ComplianceClient({
         </div>
         <div className="flex gap-3">
             <Card className="bg-primary/5 border-primary/20 py-2 px-4 h-fit flex items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.8)]" />
-                <span className="text-xs font-medium text-primary uppercase tracking-widest">Live Governance Active</span>
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-xs font-medium text-primary">Live Governance Active</span>
             </Card>
         </div>
       </div>

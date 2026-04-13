@@ -44,11 +44,11 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 const STATUS_CONFIG: Record<AgentStatus, { label: string; badge: string; dot: string }> = {
-  RUNNING:       { label: "Running",       badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",  dot: "bg-emerald-400 animate-pulse" },
+  RUNNING:       { label: "Running",       badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",  dot: "bg-emerald-400" },
   IDLE:          { label: "Idle",          badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",           dot: "bg-zinc-500" },
   PAUSED:        { label: "Paused",        badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",        dot: "bg-amber-400" },
-  ERROR:         { label: "Error",         badge: "bg-red-500/15 text-red-400 border-red-500/30",              dot: "bg-red-400 animate-pulse" },
-  REVIEW_NEEDED: { label: "Review Needed", badge: "bg-purple-500/15 text-purple-400 border-purple-500/30",     dot: "bg-purple-400 animate-pulse" },
+  ERROR:         { label: "Error",         badge: "bg-red-500/15 text-red-400 border-red-500/30",              dot: "bg-red-400" },
+  REVIEW_NEEDED: { label: "Review Needed", badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",        dot: "bg-amber-400" },
 };
 
 const OUTPUT_TYPE_COLORS: Record<string, string> = {
@@ -83,8 +83,8 @@ const container: Variants = {
   show: { opacity: 1, transition: { staggerChildren: 0.05 } },
 };
 const itemVar: Variants = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 380, damping: 28 } },
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.3 } },
 };
 
 // --------------------------------------------------
@@ -523,9 +523,9 @@ export function AgentCommandCenterClient({ agents: initialAgents, workload: init
             <p className="text-sm text-muted-foreground">Your AI workforce — monitor, control, and review every agent</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono text-emerald-400">{workload.running} ACTIVE</span>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="text-xs font-medium text-emerald-400">{workload.running} ACTIVE</span>
             </div>
             {workload.reviewNeeded > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20">

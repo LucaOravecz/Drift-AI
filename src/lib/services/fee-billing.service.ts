@@ -341,8 +341,9 @@ export class FeeBillingService {
     await prisma.complianceRule.create({
       data: {
         organizationId: schedule.organizationId,
+        type: "FEE_SCHEDULE",
         category: "FEE_SCHEDULE",
-        ruleName: schedule.name,
+        name: schedule.name,
         severity: "INFO",
         config: schedule as any,
       },

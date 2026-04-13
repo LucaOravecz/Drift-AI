@@ -198,9 +198,12 @@ export class BillingService {
    * Get billing summary for the current period.
    */
   static async getBillingSummary(organizationId: string) {
-    const [subscription, limits, aiUsage, activeUsers, clientCount] = await Promise.all([
+    const [subscription, limits] = await Promise.all([
       this.getSubscription(organizationId),
       this.getPlanLimits(organizationId),
+    ]);
+
+    const [aiUsage, activeUsers, clientCount] = await Promise.all([
       (async () => {
         const startOfMonth = new Date();
         startOfMonth.setDate(1);

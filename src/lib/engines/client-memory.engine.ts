@@ -89,6 +89,7 @@ export async function buildClientMemoryProfile(clientId: string): Promise<Client
       opportunities: { where: { status: { in: ["DRAFT", "PENDING_REVIEW"] } }, take: 5 },
       taxInsights: { where: { status: "UNDER_REVIEW" }, take: 5 },
       relationshipEvents: { orderBy: { eventDate: "asc" }, take: 5 },
+      clientTags: { include: { tag: true } },
     },
   })
 
@@ -125,9 +126,9 @@ export async function buildClientMemoryProfile(clientId: string): Promise<Client
     phone: client.phone
       ? { value: client.phone, source: "STORED_FIELD" as const, confidence: "HIGH" as const, evidence: "clients.phone" }
       : { value: "Not on file", source: "STORED_FIELD" as const, confidence: "INSUFFICIENT" as const, evidence: "clients.phone is null" },
-    tags: client.tags
-      ? { value: client.tags, source: "STORED_FIELD" as const, confidence: "HIGH" as const, evidence: "clients.tags" }
-      : { value: "None", source: "STORED_FIELD" as const, confidence: "HIGH" as const, evidence: "clients.tags is null" },
+    tags: client.clientTags.length > 0
+      ? { value: client.clientTags.map((ct: any) => ct.tag?.name).filter(Boolean).join(", "), source: "STORED_FIELD" as const, confidence: "HIGH" as const, evidence: "clients.clientTags" }
+      : { value: "None", source: "STORED_FIELD" as const, confidence: "HIGH" as const, evidence: "clients.clientTags is empty" },
     lastContact: client.lastContactAt
       ? { value: new Date(client.lastContactAt).toLocaleDateString(), source: "STORED_FIELD" as const, confidence: "HIGH" as const, evidence: "clients.lastContactAt" }
       : { value: "No contact recorded", source: "STORED_FIELD" as const, confidence: "INSUFFICIENT" as const, evidence: "clients.lastContactAt is null" },

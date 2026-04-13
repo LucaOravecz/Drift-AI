@@ -103,8 +103,9 @@ export class WorkflowEngineService {
     const rule = await prisma.complianceRule.create({
       data: {
         organizationId: definition.organizationId,
+        type: "WORKFLOW",
         category: "WORKFLOW",
-        ruleName: definition.name,
+        name: definition.name,
         severity: "INFO",
         config: definition as any,
       },
@@ -140,7 +141,7 @@ export class WorkflowEngineService {
     });
 
     const matchingDef = definitions.find((d) => {
-      const config = d.config as WorkflowDefinition;
+      const config = d.config as unknown as WorkflowDefinition;
       return config.type === type && config.isActive;
     });
 
@@ -163,7 +164,7 @@ export class WorkflowEngineService {
       };
     }
 
-    const definition = matchingDef.config as WorkflowDefinition;
+    const definition = matchingDef.config as unknown as WorkflowDefinition;
     const firstStep = definition.steps[0];
 
     // Find the assignee for the first step
@@ -200,8 +201,7 @@ export class WorkflowEngineService {
       await SSENotificationService.pushToUser(assignee.id, {
         type: "WORKFLOW_ASSIGNED",
         title: `Workflow: ${firstStep.name}`,
-        message: `You have been assigned step "${firstStep.name}" in a ${type} workflow`,
-        organizationId,
+        body: `You have been assigned step "${firstStep.name}" in a ${type} workflow`,
         metadata: { workflowId: instance.id, step: firstStep.name },
       });
     }
@@ -252,8 +252,7 @@ export class WorkflowEngineService {
           await SSENotificationService.pushToUser(assignee.id, {
             type: "WORKFLOW_ASSIGNED",
             title: `Workflow: ${nextDef.name}`,
-            message: `You have been assigned step "${nextDef.name}" in a ${instance.type} workflow`,
-            organizationId: instance.organizationId,
+            body: `You have been assigned step "${nextDef.name}" in a ${instance.type} workflow`,
             metadata: { workflowId: instance.id },
           });
         }
@@ -299,8 +298,7 @@ export class WorkflowEngineService {
     await SSENotificationService.pushToUser(instance.initiatedBy, {
       type: "WORKFLOW_REJECTED",
       title: `Workflow Rejected: ${instance.type}`,
-      message: `Step "${step.stepName}" was rejected. Reason: ${reason}`,
-      organizationId: instance.organizationId,
+      body: `Step "${step.stepName}" was rejected. Reason: ${reason}`,
       metadata: { workflowId: instance.id, stepOrder, reason },
     });
 
@@ -354,6 +352,6 @@ export class WorkflowEngineService {
     });
 
     if (!rule) return null;
-    return rule.config as WorkflowDefinition;
+    return rule.config as unknown as WorkflowDefinition;
   }
 }

@@ -118,8 +118,8 @@ export class ClientPortalService {
     ipAddress: string,
     userAgent: string,
   ): Promise<ClientPortalSession | null> {
-    const client = await prisma.client.findUnique({
-      where: { email: email.toLowerCase() },
+    const client = await prisma.client.findFirst({
+      where: { email: email.toLowerCase(), deletedAt: null },
     });
 
     if (!client) return null;
@@ -214,8 +214,8 @@ export class ClientPortalService {
       title: m.title,
       date: m.scheduledAt,
       duration: 60,
-      location: m.location ?? undefined,
-      meetingUrl: m.meetingUrl ?? undefined,
+      location: undefined,
+      meetingUrl: undefined,
     }));
 
     return {
@@ -253,13 +253,11 @@ export class ClientPortalService {
     const comm = await prisma.communication.create({
       data: {
         clientId,
-        channel: "PORTAL",
+        type: "EMAIL",
         direction: "INBOUND",
         subject,
         body,
-        status: "RECEIVED",
-        aiSummary: null,
-        complianceStatus: "PENDING",
+        status: "DRAFT",
       },
     });
 
@@ -279,7 +277,7 @@ export class ClientPortalService {
       subject,
       body,
       direction: "INBOUND",
-      createdAt: comm.createdAt,
+      createdAt: comm.timestamp,
       attachments,
     };
   }
@@ -289,7 +287,7 @@ export class ClientPortalService {
    */
   static async getClientDocuments(clientId: string) {
     const documents = await prisma.document.findMany({
-      where: { clientId, sharedWithClient: true },
+      where: { clientId, status: { not: 'UPLOADED' } },
       orderBy: { uploadedAt: "desc" },
       select: {
         id: true,

@@ -411,7 +411,7 @@ Return a JSON response with this structure:
       recommendedActions: string[]
       reviewWarnings: string[]
       draftContent: string | null
-    }>(systemPrompt, userMessage, 4096)
+    }>(systemPrompt, userMessage, { maxTokens: 4096, organizationId: orgId })
 
     if (result.answer) {
       sections.push({ label: "Answer", content: result.answer, type: "answer" })

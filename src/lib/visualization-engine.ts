@@ -46,7 +46,7 @@ ${request.color ? `Primary Color: ${request.color}` : ''}
 
 Generate the SVG chart code.`
 
-  return callClaude(systemPrompt, userMessage, 2048)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: 'system' })
 }
 
 /**
@@ -71,7 +71,7 @@ ${request.content}
 
 Generate the Mermaid diagram code.`
 
-  return callClaude(systemPrompt, userMessage, 2048)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: 'system' })
 }
 
 /**
@@ -99,7 +99,7 @@ Include percentage comparisons to benchmarks.`
 
 Show return comparison gauge, volatility meter, and Sharpe ratio indicator.`
 
-  return callClaude(systemPrompt, userMessage, 2048)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: 'system' })
 }
 
 /**
@@ -120,7 +120,7 @@ ${Object.entries(holdings)
 
 Generate clean SVG pie chart with legend.`
 
-  return callClaude(systemPrompt, userMessage, 2048)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: 'system' })
 }
 
 /**
@@ -143,7 +143,7 @@ ${events.map((e) => `${e.date}: ${e.event} (${e.type})`).join('\n')}
 
 Generate Mermaid timeline diagram.`
 
-  return callClaude(systemPrompt, userMessage, 2048)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: 'system' })
 }
 
 /**
@@ -170,7 +170,7 @@ Include benchmark lines if applicable.`
 
 Generate SVG radar chart visualization.`
 
-  return callClaude(systemPrompt, userMessage, 2048)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 2048, organizationId: 'system' })
 }
 
 /**
@@ -191,5 +191,5 @@ Make it professional and clear.`
 
 Use Mermaid flowchart syntax.`
 
-  return callClaude(systemPrompt, userMessage, 3072)
+  return callClaude(systemPrompt, userMessage, { maxTokens: 3072, organizationId: 'system' })
 }

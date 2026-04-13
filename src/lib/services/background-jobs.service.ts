@@ -104,9 +104,9 @@ export class BackgroundJobService {
 
       switch (jobType) {
         case "OPPORTUNITY_SCAN": {
-          const { OpportunityEngine } = await import("../engines/opportunity.engine");
-          const scanResult = await OpportunityEngine.scanAllClients(params.organizationId);
-          result = { opportunitiesCreated: scanResult.length };
+          const { getOrganizationOpportunitySummary } = await import("../engines/opportunity.engine");
+          const scanResult = await getOrganizationOpportunitySummary(params.organizationId);
+          result = { opportunitiesCreated: scanResult.totalDetected };
           break;
         }
         case "COMPLIANCE_CHECK": {
@@ -116,15 +116,15 @@ export class BackgroundJobService {
           break;
         }
         case "BRIEF_GENERATION": {
-          const { BriefEngine } = await import("../engines/brief.engine");
-          const briefResult = await BriefEngine.generateBrief(params.meetingId as string, params.organizationId);
+          const { buildGroundedBrief } = await import("../engines/brief.engine");
+          const briefResult = await buildGroundedBrief(params.meetingId as string);
           result = { briefGenerated: !!briefResult };
           break;
         }
         case "MEMORY_SNAPSHOT": {
-          const { ClientMemoryEngine } = await import("../engines/client-memory.engine");
-          const snapshotResult = await ClientMemoryEngine.generateSnapshot(params.clientId as string);
-          result = { snapshotId: snapshotResult.id };
+          const { buildClientMemoryProfile } = await import("../engines/client-memory.engine");
+          const snapshotResult = await buildClientMemoryProfile(params.clientId as string);
+          result = { snapshotId: snapshotResult.clientId };
           break;
         }
         case "CALENDAR_SYNC": {

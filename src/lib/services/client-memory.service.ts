@@ -59,8 +59,8 @@ export class ClientMemoryService {
 
     return {
       ...snapshot,
-      payload: JSON.parse(snapshot.payload),
-      missingData: snapshot.missingData ? JSON.parse(snapshot.missingData) : [],
+      payload: JSON.parse(String(snapshot.payload)),
+      missingData: snapshot.missingData ? JSON.parse(String(snapshot.missingData)) : [],
     };
   }
 }

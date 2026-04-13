@@ -160,7 +160,7 @@ Client first name: ${firstName}
 Return a JSON object: { "subject": "...", "body": "..." }
 The body should be 2-4 short paragraphs. Professional, direct, no filler.`
 
-      const result = await callClaude(systemPrompt, userMessage, 1024)
+      const result = await callClaude(systemPrompt, userMessage, { maxTokens: 1024, organizationId: ctx.organizationId, userId: ctx.userId })
 
       // Extract JSON from response
       const jsonMatch = result.match(/\{[\s\S]*\}/)
