@@ -64,11 +64,11 @@ export function useKeyboardNavigation({
       }
     };
 
-    const element = elementRef.current || document;
-    element.addEventListener("keydown", handleKeyDown);
+    const element = (elementRef.current as HTMLElement) || window;
+    (element as EventTarget).addEventListener("keydown", handleKeyDown as EventListener);
 
     return () => {
-      element.removeEventListener("keydown", handleKeyDown);
+      (element as EventTarget).removeEventListener("keydown", handleKeyDown as EventListener);
     };
   }, [
     enabled,
