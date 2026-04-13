@@ -5,6 +5,7 @@ import { useTransition } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Target, ArrowUpRight, CheckCircle2, XCircle, Loader2, Radar } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { approveOpportunity, dismissOpportunity, scanClientOpportunities, generateCommunicationDraft } from "@/lib/actions";
@@ -133,9 +134,24 @@ export function OpportunitiesClient({ opportunities }: { opportunities: Opportun
         </Button>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <AnimatePresence>
-          {opportunities.map((opp) => (
+      {opportunities.length === 0 ? (
+        <Card className="border-white/5 bg-white/[0.01] shadow-2xl">
+          <CardContent className="pt-12 pb-12">
+            <EmptyState
+              icon={Target}
+              title="No opportunities found"
+              description="Run a deterministic scan to identify opportunities from your stored client data."
+              action={{
+                label: "Run scan",
+                onClick: handleScan,
+              }}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <AnimatePresence>
+            {opportunities.map((opp) => (
             (() => {
               const finding = parseFinding(opp.reasoning);
               return (
@@ -247,6 +263,8 @@ export function OpportunitiesClient({ opportunities }: { opportunities: Opportun
           </Card>
         </motion.div>
       </div>
+        )
+      }
     </div>
   );
 }

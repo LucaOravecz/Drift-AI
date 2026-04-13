@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ClientService } from "@/lib/services/client.service";
-import { Search, Plus, Filter, MoreHorizontal } from "lucide-react";
+import { Search, Plus, Filter, MoreHorizontal, Users } from "lucide-react";
 
 export const revalidate = 0;
 
@@ -52,65 +53,71 @@ export default async function ClientsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0 relative z-10">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-white/5 hover:bg-white/[0.02]">
-                <TableHead className="w-[250px] text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Name</TableHead>
-                <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Type</TableHead>
-                <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">AUM</TableHead>
-                <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Risk Profile</TableHead>
-                <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Last Contact</TableHead>
-                <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Tags</TableHead>
-                <TableHead className="text-right text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clients.map((client: any) => (
-                <TableRow key={client.id} className="group cursor-pointer border-white/5 hover:bg-white/[0.04] transition-colors">
-                  <TableCell className="font-medium text-white/90">
-                    <Link href={`/clients/${client.id}`} className="flex flex-col hover:text-primary transition-colors">
-                      <span>{client.name}</span>
-                      <span className="text-[10px] text-zinc-500 mt-0.5 font-mono">{client.id.split('').slice(0, 8).join('')}</span>
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-normal text-[10px] bg-white/5 border-white/10 text-zinc-300">
-                      {client.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-semibold text-primary/90">{client.aum}</TableCell>
-                  <TableCell className="text-zinc-300">{client.riskProfile}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-1.5 w-1.5 rounded-full ${client.churnScore > 60 ? 'bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`} />
-                      <span className="text-xs text-zinc-400">{client.lastContact}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1 flex-wrap">
-                      {client.tags.map((tag: string, i: number) => (
-                        <span key={i} className="text-[9px] bg-zinc-800/50 text-zinc-400 px-1.5 py-0.5 rounded border border-white/5">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 hover:text-white text-zinc-500">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+          {clients.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No clients yet"
+              description="Start by adding your first client to begin managing relationships and households."
+              action={{
+                label: "Add your first client",
+                onClick: () => window.location.href = "/clients/new",
+              }}
+              className="border-t border-white/5"
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/5 hover:bg-white/[0.02]">
+                  <TableHead className="w-[250px] text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Name</TableHead>
+                  <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Type</TableHead>
+                  <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">AUM</TableHead>
+                  <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Risk Profile</TableHead>
+                  <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Last Contact</TableHead>
+                  <TableHead className="text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Tags</TableHead>
+                  <TableHead className="text-right text-zinc-500 uppercase tracking-wider text-[10px] font-bold">Actions</TableHead>
                 </TableRow>
-              ))}
-              {clients.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-zinc-500 text-sm">
-                    No clients found in the database.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {clients.map((client: any) => (
+                  <TableRow key={client.id} className="group cursor-pointer border-white/5 hover:bg-white/[0.04] transition-colors">
+                    <TableCell className="font-medium text-white/90">
+                      <Link href={`/clients/${client.id}`} className="flex flex-col hover:text-primary transition-colors">
+                        <span>{client.name}</span>
+                        <span className="text-[10px] text-zinc-500 mt-0.5 font-mono">{client.id.split('').slice(0, 8).join('')}</span>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-normal text-[10px] bg-white/5 border-white/10 text-zinc-300">
+                        {client.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-semibold text-primary/90">{client.aum}</TableCell>
+                    <TableCell className="text-zinc-300">{client.riskProfile}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-1.5 w-1.5 rounded-full ${client.churnScore > 60 ? 'bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`} />
+                        <span className="text-xs text-zinc-400">{client.lastContact}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {client.tags.map((tag: string, i: number) => (
+                          <span key={i} className="text-[9px] bg-zinc-800/50 text-zinc-400 px-1.5 py-0.5 rounded border border-white/5">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 hover:text-white text-zinc-500">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
       

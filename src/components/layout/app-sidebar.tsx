@@ -11,9 +11,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { BrandLogo } from "./brand-logo";
 import type { BrandingSnapshot } from "@/lib/brand-config";
 
@@ -68,6 +70,15 @@ const baseNavGroups = [
 
 export function AppSidebar({ branding, canManageUsers = false }: { branding: BrandingSnapshot; canManageUsers?: boolean }) {
   const pathname = usePathname();
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  // Close mobile sidebar when route changes
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [pathname, isMobile, setOpenMobile]);
+
   const navGroups = canManageUsers
     ? [
         ...baseNavGroups,
