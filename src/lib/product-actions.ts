@@ -8,6 +8,7 @@ import { SecurityService } from "@/lib/services/security.service";
 import { createPasswordHash } from "@/lib/password";
 import { passwordPolicyMessage, validatePasswordPolicy } from "@/lib/password-policy";
 import { generateMfaSecret, verifyTotp } from "@/lib/mfa";
+import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit";
 import { IntegrationService } from "@/lib/services/integration.service";
 import {
   clearMfaChallengeCookie,
@@ -60,7 +61,18 @@ export async function signInAction(formData: FormData) {
     redirect("/sign-in?error=Email%20and%20password%20are%20required");
   }
 
+  // Check rate limit
+  const rateLimit = await checkRateLimit(email);
+  if (!rateLimit.allowed) {
+    const minutes = Math.ceil((rateLimit.remainingMs || 900000) / 60000);
+    redirect(`/sign-in?error=${encodeURIComponent(`Too many attempts. Try again in ${minutes} minutes.`)}`);
+  }
+
   const result = await signInWithPassword(email, password);
+  
+  // Record login attempt
+  await recordLoginAttempt(email, result.success);
+
   if (!result.success) {
     redirect(`/sign-in?error=${encodeURIComponent(result.error)}`);
   }
@@ -90,18 +102,33 @@ export async function signOutAction() {
 
 export async function verifyMfaAction(formData: FormData) {
   const code = sanitize(formData.get("code"));
+  
+  // Check MFA rate limit by challenge ID
+  const rateLimit = await checkRateLimit(`mfa-${code}`);
+  if (!rateLimit.allowed) {
+    const minutes = Math.ceil((rateLimit.remainingMs || 900000) / 60000);
+    redirect(`/verify-mfa?error=${encodeURIComponent(`Too many attempts. Try again in ${minutes} minutes.`)}`);
+  }
+
   const challengeResult = await completeMfaChallenge(code);
   if (!challengeResult.success) {
     if (challengeResult.shouldClearCookie) {
       await clearMfaChallengeCookie();
     }
+    // Record failed MFA attempt
+    await recordLoginAttempt(`mfa-${code}`, false);
     redirect(`/verify-mfa?error=${encodeURIComponent(challengeResult.error)}`);
   }
 
   const { challenge } = challengeResult;
   if (!challenge.user.mfaSecret || !verifyTotp(challenge.user.mfaSecret, code)) {
+    // Record failed MFA attempt
+    await recordLoginAttempt(`mfa-${code}`, false);
     redirect("/verify-mfa?error=Invalid%20verification%20code");
   }
+  
+  // Record successful MFA attempt
+  await recordLoginAttempt(`mfa-${code}`, true);
 
   await prisma.pendingLoginChallenge.delete({ where: { id: challenge.id } }).catch(() => null);
   await clearMfaChallengeCookie();
