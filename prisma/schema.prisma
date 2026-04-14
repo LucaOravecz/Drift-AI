@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -20,6 +20,7 @@ model Organization {
 
   users            User[]
   clients          Client[]
+  memoryEvents     ClientMemoryEvent[]
   prospects        Prospect[]
   logs             AuditLog[]
   auditEvents      AuditEvent[]
@@ -38,6 +39,11 @@ model Organization {
   agentTasks       AgentTask[]
   agentOutputs     AgentOutput[]
   agentApprovals   AgentApproval[]
+  advDocuments          AdvDocument[]       @relation("orgAdvDocuments")
+  form13FFilings        Form13F[]           @relation("org13FFilings")
+  gipsComposites        GipsComposite[]     @relation("orgGipsComposites")
+  benchmarks            ComplianceBenchmark[] @relation("orgBenchmarks")
+  deadlines             ComplianceDeadline[]  @relation("orgDeadlines")
 
   @@index([deletedAt])
   @@map("organizations")
@@ -235,6 +241,7 @@ model Client {
   tasks               Task[]
   sentimentHistory    SentimentSnapshot[]
   memorySnapshots     ClientMemorySnapshot[]
+  memoryEvents        ClientMemoryEvent[]
   accounts            FinancialAccount[]
   clientTags          ClientTag[]
 
@@ -584,18 +591,22 @@ model RelationshipEvent {
 // --------------------------------------------------
 
 model LifeEvent {
-  id           String   @id @default(cuid())
-  clientId     String
-  title        String
-  type         String?  // RETIREMENT, BUSINESS_SALE, LIQUIDITY, INHERITANCE, RELOCATION, NEW_CHILD, EDUCATION
-  detectedFrom String?
-  implications String?
-  opportunity  String?
-  createdAt    DateTime @default(now())
+  id                  String   @id @default(cuid())
+  clientId            String
+  title               String
+  type                String?  // RETIREMENT, BUSINESS_SALE, LIQUIDITY, INHERITANCE, RELOCATION, NEW_CHILD, EDUCATION
+  detectedFrom        String?
+  implications        String?
+  opportunity         String?
+  originalDate        DateTime? // When the life event originally occurred (e.g., child's birth)
+  isAnniversaryEvent  Boolean  @default(true) // Should we track annual anniversaries?
+  nextAnniversaryDate DateTime? // Computed: next occurrence of the annual date
+  createdAt           DateTime @default(now())
 
-  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client              Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
+  @@index([nextAnniversaryDate])
   @@map("life_events")
 }
 
@@ -610,6 +621,9 @@ model Meeting {
   briefGenerated Boolean  @default(false)
   briefText      String?
   notes          String?
+
+  source         String?     // MANUAL | GOOGLE_CALENDAR
+  externalEventId String?    // For synced calendar events
 
   client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -671,6 +685,139 @@ model ComplianceFlag {
   @@map("compliance_flags")
 }
 
+// ── REGULATORY DOCUMENT PERSISTENCE ───────────────────────────────
+
+model AdvDocument {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation("orgAdvDocuments", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  version         Int      @default(1)         // 1 = 2024, 2 = 2025 amendment
+  filingYear      Int                          // Tax year
+  crdNumber       String?                      // SEC CRD number
+  formType        String   @default("2A")      // 2A or 2B
+
+  // Generated document snapshot
+  documentSnapshot  String                    // Full ADV text (generated)
+  part2ASection    String?                    // Form 2A brochure
+  part2BSection    String?                    // Form 2B brochure supplement (per advisor)
+
+  // Status workflow
+  status          String   @default("DRAFT")  // DRAFT, UNDER_REVIEW, APPROVED, FILED
+  reviewedAt      DateTime?
+  reviewedBy      String?                     // User ID
+  filedAt         DateTime?
+  filedBy         String?
+  secReferenceId  String?                     // SEC filing confirmation ID
+
+  // Audit trail
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, filingYear, version])
+  @@index([organizationId, status])
+  @@index([filingYear])
+  @@map("adv_documents")
+}
+
+model Form13F {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation("org13FFilings", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  reportingPeriod DateTime                    // Quarter end date
+  crdNumber       String?
+
+  // Holdings snapshot
+  holdingsSnapshot String                    // 13F-HR table (XML or CSV format)
+  totalValue      Float?                     // Total value of holdings
+
+  // Workflow
+  status          String   @default("DRAFT")  // DRAFT, UNDER_REVIEW, APPROVED, FILED
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  filedAt         DateTime?
+  secReferenceId  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, reportingPeriod])
+  @@index([organizationId, status])
+  @@map("form_13f_filings")
+}
+
+model GipsComposite {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation("orgGipsComposites", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  compositeName   String   // e.g., "Equity Composite", "Balanced Composite"
+  description     String?
+  inceptionDate   DateTime
+
+  // Benchmark mapping
+  benchmarkId     String?  // FK to ComplianceBenchmark
+
+  // Performance snapshot (annual)
+  performanceYear Int                        // Year of performance
+  performanceData String                    // JSON: returns, volatility, Sharpe, attribution
+
+  // Attestation
+  gipsAttested    Boolean  @default(false)
+  attestedAt      DateTime?
+  attestedBy      String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, compositeName, performanceYear])
+  @@index([organizationId])
+  @@map("gips_composites")
+}
+
+model ComplianceBenchmark {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation("orgBenchmarks", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  benchmarkName   String   // e.g., "S&P 500", "Russell 2000"
+  ticker          String?  // e.g., "SPY", "IWM"
+  apiSource       String?  // "YAHOO", "BLOOMBERG", "MANUAL"
+
+  // Benchmark data (annual)
+  returnData      String                    // JSON: { year => return% }
+  lastUpdated     DateTime @default(now())
+
+  createdAt       DateTime @default(now())
+
+  @@unique([organizationId, benchmarkName])
+  @@index([organizationId])
+  @@map("compliance_benchmarks")
+}
+
+model ComplianceDeadline {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation("orgDeadlines", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  deadlineType    String   // "ADV_ANNUAL_UPDATE", "FORM_13F_FILING", "GIPS_ATTESTATION"
+  description     String
+  dueDate         DateTime
+  alertDays       Int      @default(30)   // Alert N days before
+
+  // Resolution
+  status          String   @default("PENDING")  // PENDING, IN_PROGRESS, COMPLETED, MISSED
+  completedAt     DateTime?
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId, status, dueDate])
+  @@map("compliance_deadlines")
+}
+
 model AuditLog {
   id             String   @id @default(cuid())
   organizationId String
@@ -698,16 +845,44 @@ model ClientMemorySnapshot {
   id             String   @id @default(cuid())
   clientId        String
   generatedBy     String   @default("DETERMINISTIC")
+  profileVersion  Int      @default(2)
   dataQuality     String
   summary         String
   payload         Json     // Structured memory payload
   missingData     Json?    // Structured missing data list
+  windowStartAt   DateTime?
+  windowEndAt     DateTime?
+  generatedFromEventCount Int @default(0)
   createdAt       DateTime @default(now())
 
   client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId, createdAt])
   @@map("client_memory_snapshots")
+}
+
+model ClientMemoryEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  clientId       String
+  sourceType     String   // COMMUNICATION, MEETING, DOCUMENT, LIFE_EVENT, SNAPSHOT, SIGNAL, TASK
+  sourceId       String?
+  eventType      String   // COMMUNICATION_CAPTURED, MEETING_CAPTURED, SENTIMENT_DRIFT, LIFE_EVENT_PREDICTION, AUM_AT_RISK, CLIENT_DNA_REFRESHED
+  title          String
+  summary        String
+  importance     Int      @default(50) // 0-100 priority for downstream ranking
+  evidence       Json?
+  payload        Json?
+  externalKey    String?  @unique
+  recordedAt     DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, recordedAt])
+  @@index([clientId, recordedAt])
+  @@index([clientId, eventType])
+  @@map("client_memory_events")
 }
 
 model FinancialAccount {
@@ -1029,6 +1204,16 @@ model AgentOutput {
   @@index([reviewStatus])
   @@index([createdAt])
   @@map("agent_outputs")
+}
+
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  identifier  String   // email or IP
+  success     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([identifier, createdAt])
+  @@map("login_attempts")
 }
 
 model AgentApproval {

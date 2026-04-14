@@ -10,6 +10,7 @@ env:
   NODE_VERSION: "20"
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/drift_test"
   DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/drift_test"
+  CLIENT_PORTAL_ACCESS_CODE_HASH: "995331cb475fb701a4a204142e14bcec1277027ef345f119b7cb1fd071668a20"
 
 jobs:
   lint-and-typecheck:
@@ -25,6 +26,11 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: npm run lint
+      - run: npm run build
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DIRECT_URL: ${{ env.DIRECT_URL }}
+          CLIENT_PORTAL_ACCESS_CODE_HASH: ${{ env.CLIENT_PORTAL_ACCESS_CODE_HASH }}
 
   test-unit:
     name: Unit Tests
@@ -101,6 +107,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           DIRECT_URL: ${{ env.DIRECT_URL }}
+          CLIENT_PORTAL_ACCESS_CODE_HASH: ${{ env.CLIENT_PORTAL_ACCESS_CODE_HASH }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

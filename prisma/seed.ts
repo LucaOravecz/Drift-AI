@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { createPasswordHash } from '../src/lib/password'
+import { calculateNextAnniversaryDate } from '../src/lib/utils/anniversary'
 
 const prisma = new PrismaClient()
 
@@ -65,6 +66,94 @@ async function main() {
       supportEmail: 'support@drift.ai',
       notificationsEmail: 'ops@drift.ai',
     },
+  })
+
+  await prisma.integrationConfig.createMany({
+    data: [
+      {
+        organizationId: org.id,
+        provider: 'SCHWAB',
+        category: 'CUSTODIAN',
+        status: 'ACTIVE',
+        lastSyncAt: new Date(Date.now() - 18 * 60 * 1000),
+        syncIntervalMinutes: 15,
+        errorCount: 0,
+        config: {
+          demoAccountsSynced: 11,
+          demoPositionsUpdated: 184,
+          connectionType: 'DIRECT_CUSTODIAN_API',
+          householdsCovered: ['Williams Trust', 'Peterson Household', 'Harrison Family'],
+        },
+      },
+      {
+        organizationId: org.id,
+        provider: 'SALESFORCE_FSC',
+        category: 'CRM',
+        status: 'ACTIVE',
+        lastSyncAt: new Date(Date.now() - 42 * 60 * 1000),
+        syncIntervalMinutes: 30,
+        errorCount: 0,
+        config: {
+          demoContactsImported: 126,
+          demoContactsUpdated: 42,
+          primaryUseCase: 'HOUSEHOLD_INTELLIGENCE',
+          mappedObjects: ['Household', 'Contact', 'Opportunity', 'Task'],
+        },
+      },
+      {
+        organizationId: org.id,
+        provider: 'GOOGLE_CALENDAR',
+        category: 'CALENDAR',
+        status: 'ACTIVE',
+        lastSyncAt: new Date(Date.now() - 9 * 60 * 1000),
+        syncIntervalMinutes: 10,
+        errorCount: 0,
+        config: {
+          demoMeetingsImported: 9,
+          advisorOwner: 'Elena Rostova',
+          syncWindowDays: 14,
+        },
+      },
+      {
+        organizationId: org.id,
+        provider: 'POSTMARK',
+        category: 'EMAIL_DELIVERY',
+        status: 'ACTIVE',
+        lastSyncAt: new Date(Date.now() - 75 * 60 * 1000),
+        syncIntervalMinutes: 60,
+        errorCount: 0,
+        config: {
+          demoTemplateCount: 6,
+          deliveryHealth: 'GREEN',
+          complianceArchiving: true,
+        },
+      },
+      {
+        organizationId: org.id,
+        provider: 'ADDEPAR',
+        category: 'PORTFOLIO_ACCOUNTING',
+        status: 'PENDING',
+        syncIntervalMinutes: 60,
+        errorCount: 0,
+        config: {
+          stage: 'DEMO_READY_PENDING_CREDENTIALS',
+        },
+      },
+      {
+        organizationId: org.id,
+        provider: 'POLYGON',
+        category: 'MARKET_DATA',
+        status: 'ERROR',
+        lastSyncAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+        syncIntervalMinutes: 60,
+        errorCount: 3,
+        lastError: 'Market data API key rotated. Re-auth required before opening-bell refresh.',
+        config: {
+          lastHealthyAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          feeds: ['US_EQUITIES', 'OPTIONS'],
+        },
+      },
+    ],
   })
 
   const advisor = await prisma.user.create({
@@ -1082,6 +1171,13 @@ async function main() {
   })
 
   // ── 13. Life Events ───────────────────────────────────────────────────────
+  // Helper to calculate anniversary dates
+  const createAnniversaryDate = (monthOffset: number = 0): Date => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + monthOffset)
+    return date
+  }
+
   await prisma.lifeEvent.createMany({
     data: [
       {
@@ -1091,6 +1187,9 @@ async function main() {
         detectedFrom: 'Date of birth in client profile',
         implications: 'First RMD required by April 1 of year following turning 73. Combined IRA balance $1.8M. Estimated annual RMD $68,000.',
         opportunity: 'QCD strategy to offset RMD impact. Roth conversion prior to RMD start.',
+        originalDate: new Date(1951, 2, 15), // March 15, 1951
+        isAnniversaryEvent: true,
+        nextAnniversaryDate: calculateNextAnniversaryDate(new Date(1951, 2, 15)),
       },
       {
         clientId: c5.id,
@@ -1099,6 +1198,9 @@ async function main() {
         detectedFrom: 'Custodian address change detected 09/2024',
         implications: 'Florida has no state income tax or estate tax. Previous NJ estate plan may be invalid or suboptimal.',
         opportunity: 'Estate plan update. Potential domicile-based tax savings. New network referrals.',
+        originalDate: new Date(2024, 8, 15), // September 15, 2024
+        isAnniversaryEvent: true,
+        nextAnniversaryDate: calculateNextAnniversaryDate(new Date(2024, 8, 15)),
       },
       {
         clientId: c4.id,
@@ -1107,6 +1209,9 @@ async function main() {
         detectedFrom: 'Trust account large inflow detected via custodian feed',
         implications: 'Large lump-sum creates short-term tax event and long-term investment planning opportunity.',
         opportunity: 'Immediate investment of proceeds. Year-end tax planning. Gift and estate tax planning window.',
+        originalDate: new Date(2024, 10, 1), // November 1, 2024
+        isAnniversaryEvent: true,
+        nextAnniversaryDate: calculateNextAnniversaryDate(new Date(2024, 10, 1)),
       },
       {
         clientId: c2.id,
@@ -1115,6 +1220,9 @@ async function main() {
         detectedFrom: 'Client disclosed in meeting 06/2024',
         implications: 'Increased income, new business entity, additional employees. More complex financial picture.',
         opportunity: 'DB plan, group benefits, buy-sell agreement, business succession planning.',
+        originalDate: new Date(2024, 5, 15), // June 15, 2024
+        isAnniversaryEvent: true,
+        nextAnniversaryDate: calculateNextAnniversaryDate(new Date(2024, 5, 15)),
       },
     ],
   })
@@ -1355,6 +1463,24 @@ async function main() {
         title: 'Opportunity awaiting review',
         body: 'A high-value opportunity remains in pending review and needs senior approval.',
         link: '/opportunities',
+        status: 'UNREAD',
+      },
+      {
+        organizationId: org.id,
+        userId: advisor.id,
+        type: 'INTEGRATION',
+        title: 'Salesforce sync completed',
+        body: '42 household and contact records were refreshed from Salesforce FSC and mapped into Drift.',
+        link: '/integrations',
+        status: 'UNREAD',
+      },
+      {
+        organizationId: org.id,
+        userId: advisor.id,
+        type: 'INTEGRATION',
+        title: 'Calendar prep queue refreshed',
+        body: 'Google Calendar imported 3 upcoming client meetings into the briefing queue.',
+        link: '/meetings',
         status: 'UNREAD',
       },
       {

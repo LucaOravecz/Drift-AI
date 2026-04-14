@@ -1,90 +1,21 @@
-# Drift AI - Comprehensive Testing Report
-Date: 2026-04-12
+# Drift AI Test Report
+Date: 2026-04-13
 
-## Test Environment
-- Stack: Next.js 16.2.2, TypeScript, Prisma + SQLite
-- Database: ✅ Seeded with 5 test users
-- Dev Server: ✅ Running on http://localhost:3000
+## Verified checks
 
-## Test Credentials Available
-- admin@drift.ai / admin123456 (Admin)
-- advisor@drift.ai / advisor123 (Advisor)
-- senior@drift.ai / senior123 (Senior Advisor)
-- compliance@drift.ai / compliance123 (Compliance Officer)
-- cpa@drift.ai (CPA - password needed)
+- `npm test`: PASS
+- `npm run lint -- --quiet`: PASS
+- `npx tsc --noEmit`: PASS
 
-## Features to Test
+## Notes
 
-### ✅ Core Navigation (27 Routes Verified)
-- Dashboard (/)
-- Clients & Client Details ([id])
-- Opportunities
-- Account Settings
-- Billing
-- Integrations
-- And 21 more...
+- Unit tests are resilient to an unreachable database and still run for pure service logic.
+- A full production `next build` could not be conclusively verified in this sandbox because the build process did not emit a final result here.
+- Public auth-facing pages were forced dynamic to avoid build-time data resolution for database-backed branding and invite/session flows.
 
-### 🔐 Authentication & Sessions
-- [ ] Sign-in page loads correctly
-- [ ] Form submission with valid credentials
-- [ ] Error handling for invalid credentials
-- [ ] Password reset flow
-- [ ] MFA verification
-- [ ] Session persistence
-- [ ] Sign-out clears session
+## Critical fixes applied
 
-### 📊 Core Features to Verify
-- [ ] Dashboard loads with real data
-- [ ] Client list displays
-- [ ] Opportunities view works
-- [ ] Tax Insights rendering
-- [ ] Meeting Briefs generation
-- [ ] Investment Research display
-- [ ] Communications management
-- [ ] Compliance tracking
-- [ ] Audit ledger
-- [ ] Document handling
-- [ ] Sales pipeline
-- [ ] Onboarding workflow
-- [ ] Tax-Loss Harvesting (TLH)
-- [ ] News Oracle feed
-- [ ] Proactive Triggers
-- [ ] IPS & Proposals
-
-### 🤖 AI Features
-- [ ] Intelligence Engine page loads
-- [ ] Agent Command Center displays agents
-- [ ] Agent status updates (8s polling)
-- [ ] Run/Pause/Resume actions work
-- [ ] Output approval workflow
-- [ ] Activity feed updates
-- [ ] Performance analytics display
-- [ ] Copilot responsiveness
-
-### ⚙️ Admin Features (for admin/senior roles)
-- [ ] Admin Users page accessible
-- [ ] User management interface
-- [ ] Bulk operations
-
-### 🎨 UI/UX Observations
-- [ ] Dark theme consistent
-- [ ] Responsive sidebar
-- [ ] Smooth transitions
-- [ ] Error handling visible
-- [ ] Loading states clear
-
-## Build Status
-✅ TypeScript compilation successful
-✅ No errors or warnings
-✅ All routes registered
-✅ Assets optimized
-
-## Issues Found
-(To be populated during testing)
-
-## Improvements Identified
-(To be populated during testing)
-
-## Test Completion
-- Started: In progress
-- Estimated: 30-45 minutes
+- Locked down `/api/clients` so it now requires authentication and uses the authenticated tenant context.
+- Added a local `server-only` shim path so tests and TypeScript can resolve the import consistently.
+- Repaired client tag mapping drift after the schema move to `clientTags`.
+- Fixed React/lint correctness blockers in the copilot, theme hook, documents UI, and several services.

@@ -1,13 +1,21 @@
 import { beforeAll, afterAll, afterEach } from "vitest";
 import prisma from "./src/lib/db";
 
+let hasDatabase = Boolean(process.env.DATABASE_URL);
+
 // Global test setup
 beforeAll(async () => {
-  // Ensure test database is connected
-  await prisma.$connect();
+  if (!hasDatabase) return;
+  try {
+    await prisma.$connect();
+  } catch {
+    hasDatabase = false;
+  }
 });
 
 afterEach(async () => {
+  if (!hasDatabase) return;
+
   // Clean up test data between tests (order matters for FK constraints)
   const tablenames = [
     "ai_usage_records",
@@ -57,5 +65,6 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  if (!hasDatabase) return;
   await prisma.$disconnect();
 });

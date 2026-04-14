@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Drift AI
 
-## Getting Started
+Drift AI is a Next.js application for financial advisory teams. It combines a CRM-style client workspace with AI-assisted tools for meeting prep, compliance review, tax workflows, document intelligence, onboarding, billing, integrations, and internal operations.
 
-First, run the development server:
+## What the app includes
+
+- Authenticated advisor workspace with role-aware navigation
+- Client records, household data, opportunities, meetings, documents, and communications
+- AI-assisted copilot and intelligence workflows grounded in stored firm data
+- Compliance, audit, tax, onboarding, billing, and integration surfaces
+- Prisma-backed persistence and seeded demo data for local development
+
+## Tech stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- Prisma
+- Vitest
+- Playwright
+- Tailwind CSS
+
+## Local development
+
+1. Install dependencies.
+2. Copy `.env.example` into `.env.local` and adjust values if needed.
+3. Start a local Postgres instance for reliable development and smoke testing.
+4. Run the Prisma workflow your environment needs.
+5. Start the dev server.
+
+```bash
+npm run db:start
+npm run db:migrate:local
+npm run db:seed:local
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set `DEMO_MODE=true` in `.env.local` when you want a client-safe walkthrough environment that locks sync/import and approval actions.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+When you are done with local Postgres:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run db:stop
+```
 
-## Learn More
+## Validation
 
-To learn more about Next.js, take a look at the following resources:
+The repo currently passes these local checks:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test
+npm run lint -- --quiet
+npx tsc --noEmit
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+For browser-level smoke coverage against the local database:
 
-## Deploy on Vercel
+```bash
+npm run test:e2e:local
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The app expects a reachable Postgres database for full runtime behavior.
+- The local Docker Compose database is the most reliable path for demos and Playwright runs.
+- Some AI and market-data features depend on external provider credentials.
+- The project root previously had stale status docs; prefer the code and the commands above as the current source of truth.
