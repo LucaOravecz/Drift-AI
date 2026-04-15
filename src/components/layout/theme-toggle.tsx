@@ -1,40 +1,48 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "@/lib/useTheme";
 
 export function ThemeToggle() {
-  const { theme, setTheme, isDark } = useTheme();
+  const [isDark, setIsDark] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem("drift-theme");
+    const dark = stored ? stored === "dark" : true;
+    setIsDark(dark);
+    document.documentElement.classList.toggle("light", !dark);
+    document.documentElement.classList.toggle("dark", dark);
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  }, []);
+
+  const toggle = () => {
+    const next = !isDark;
+    setIsDark(next);
+    localStorage.setItem("drift-theme", next ? "dark" : "light");
+    document.documentElement.classList.toggle("light", !next);
+    document.documentElement.classList.toggle("dark", next);
+    document.documentElement.style.colorScheme = next ? "dark" : "light";
+  };
+
+  if (!mounted) return null;
 
   return (
-    <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
-      <button
-        type="button"
-        onClick={() => setTheme("light")}
-        aria-pressed={!isDark}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-all ${!isDark ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-200"}`}
-        title="Light mode"
-      >
-        <Sun className="h-4 w-4" strokeWidth={1.75} />
-      </button>
-      <button
-        type="button"
-        onClick={() => setTheme("dark")}
-        aria-pressed={isDark}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-all ${isDark ? "bg-white/[0.14] text-white shadow-[0_0_18px_rgba(255,255,255,0.08)]" : "text-zinc-500 hover:text-zinc-900"}`}
-        title="Dark mode"
-      >
-        <Moon className="h-4 w-4" strokeWidth={1.75} />
-      </button>
-      <button
-        type="button"
-        onClick={() => setTheme("system")}
-        aria-pressed={theme === "system"}
-        className={`px-3 text-xs font-medium transition-colors ${theme === "system" ? "text-foreground" : "text-zinc-500 hover:text-foreground"}`}
-        title="System theme"
-      >
-        Auto
-      </button>
-    </div>
+    <button
+      onClick={toggle}
+      aria-label="Toggle theme"
+      className="flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.72)",
+        borderColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)",
+        color: isDark ? "rgba(255,255,255,0.62)" : "rgba(10,13,18,0.56)",
+        boxShadow: isDark
+          ? "inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.18)"
+          : "inset 0 1px 0 rgba(255,255,255,0.85), 0 10px 24px rgba(12,16,24,0.08)",
+      }}
+    >
+      {isDark ? <Sun className="h-3.5 w-3.5" strokeWidth={1.5} /> : <Moon className="h-3.5 w-3.5" strokeWidth={1.5} />}
+    </button>
   );
 }

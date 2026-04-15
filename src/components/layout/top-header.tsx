@@ -5,6 +5,7 @@ import { CommandMenu } from "./command-menu";
 import { IntelligencePulse } from "../intelligence-pulse";
 import { NotificationsMenu } from "./notifications-menu";
 import { AccountMenu } from "./account-menu";
+import { ThemeToggle } from "./theme-toggle";
 import type { BrandingSnapshot } from "@/lib/brand-config";
 
 interface TopHeaderProps {
@@ -35,16 +36,34 @@ interface TopHeaderProps {
 
 export function TopHeader({ branding, currentUser, summary, notifications, unreadCount }: TopHeaderProps) {
   return (
-    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-zinc-700 bg-zinc-950 px-5">
-      <SidebarTrigger className="text-zinc-500 hover:text-zinc-200 transition-colors" />
+    <header
+      className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-5 backdrop-blur-xl"
+      style={{
+        background: "color-mix(in srgb, var(--background) 78%, transparent)",
+        borderBottomColor: "color-mix(in srgb, var(--border) 100%, transparent)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+      }}
+    >
+      <SidebarTrigger
+        className="rounded-full border border-[color:var(--border)] bg-[color:var(--muted)] text-[color:var(--muted-foreground)] hover:bg-[color:var(--secondary)] hover:text-[color:var(--foreground)]"
+      />
 
-      <div className="flex h-5 items-center gap-2 px-2 md:px-0">
-        <span className="text-[11px] font-medium text-zinc-600">{branding.shortName}</span>
-        <span className="text-zinc-800">/</span>
-        <span className="text-[11px] font-semibold text-zinc-300">Intelligence</span>
+      <div
+        className="flex h-7 items-center gap-2 px-3"
+        style={{
+          background: "color-mix(in srgb, var(--muted) 100%, transparent)",
+          border: "0.5px solid color-mix(in srgb, var(--border) 125%, transparent)",
+          borderRadius: "999px",
+          color: "color-mix(in srgb, var(--foreground) 72%, transparent)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+        }}
+      >
+        <span className="text-[11px] font-medium">{branding.shortName}</span>
+        <span className="opacity-25">/</span>
+        <span className="text-[11px] font-semibold">Intelligence</span>
       </div>
 
-      <div className="flex flex-1 items-center gap-4 justify-center">
+      <div className="flex flex-1 items-center justify-center gap-4">
         <div className="max-w-md w-full flex items-center gap-4">
           <CommandMenu />
           <div className="hidden lg:block">
@@ -54,9 +73,13 @@ export function TopHeader({ branding, currentUser, summary, notifications, unrea
       </div>
       <div className="flex items-center gap-3">
         <NotificationsMenu notifications={notifications} unreadCount={unreadCount} />
-        <Link href="/settings" className="text-zinc-600 hover:text-zinc-300 transition-colors">
+        <Link
+          href="/settings"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--muted)] text-[color:var(--muted-foreground)] transition-all duration-200 hover:scale-[1.02] hover:bg-[color:var(--secondary)] hover:text-[color:var(--foreground)]"
+        >
           <Settings className="h-4 w-4" strokeWidth={1.5} />
         </Link>
+        <ThemeToggle />
         <AccountMenu currentUser={currentUser} summary={summary} />
       </div>
     </header>

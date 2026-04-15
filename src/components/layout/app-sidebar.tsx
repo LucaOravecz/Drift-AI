@@ -90,14 +90,40 @@ export function AppSidebar({ branding, canManageUsers = false }: { branding: Bra
     : baseNavGroups;
 
   return (
-    <Sidebar variant="sidebar" collapsible="icon">
-      <SidebarHeader className="p-5 pb-3">
-        <BrandLogo branding={branding} />
+    <Sidebar
+      variant="floating"
+      collapsible="icon"
+      className="border-r-0 p-3"
+      style={{
+        ["--sidebar-width" as string]: "17rem",
+      }}
+    >
+      <SidebarHeader className="px-4 pb-4 pt-5">
+        <div
+          className="glass-bright flex min-h-[72px] items-center px-4"
+          style={{
+            background: "linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 100%, rgba(255,255,255,0.04)) 0%, color-mix(in srgb, var(--sidebar) 88%, transparent) 100%)",
+          }}
+        >
+          <BrandLogo branding={branding} />
+        </div>
       </SidebarHeader>
-      <SidebarContent className="px-3 pb-4">
+      <SidebarContent
+        className="px-3 pb-4"
+        style={{
+          background: "transparent",
+        }}
+      >
         {navGroups.map((group, gi) => (
           <SidebarGroup key={group.label} className={gi > 0 ? "mt-1" : ""}>
-            <SidebarGroupLabel className="text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-600 px-2 mb-1">{group.label}</SidebarGroupLabel>
+            <SidebarGroupLabel
+              className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.08em]"
+              style={{
+                color: "color-mix(in srgb, var(--sidebar-foreground) 38%, transparent)",
+              }}
+            >
+              {group.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
@@ -107,10 +133,32 @@ export function AppSidebar({ branding, canManageUsers = false }: { branding: Bra
                       <SidebarMenuButton
                         isActive={isActive}
                         tooltip={item.title}
-                        className={`h-8 rounded-lg text-[13px] font-medium transition-all duration-200 ${isActive ? "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/15 hover:bg-emerald-500/15" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"}`}
+                        className={`h-10 rounded-[10px] px-1.5 text-[13px] font-medium transition-all duration-200 ${isActive ? "translate-x-[1px]" : "hover:translate-x-[2px]"}`}
+                        style={
+                          isActive
+                            ? {
+                                background: "rgba(29,158,117,0.15)",
+                                border: "0.5px solid rgba(29,158,117,0.25)",
+                                borderRadius: "10px",
+                                color: "#5DCAA5",
+                                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+                              }
+                            : {
+                                borderRadius: "10px",
+                                color: "color-mix(in srgb, var(--sidebar-foreground) 82%, transparent)",
+                                background: "transparent",
+                                border: "0.5px solid transparent",
+                              }
+                        }
                       >
                         <Link href={item.url} className="flex items-center gap-2.5 w-full">
-                          <item.icon className={`h-[15px] w-[15px] ${isActive ? "text-emerald-400" : "text-zinc-500"}`} strokeWidth={1.5} />
+                          <item.icon
+                            className="h-[15px] w-[15px]"
+                            style={{
+                              color: isActive ? "#5DCAA5" : "color-mix(in srgb, var(--sidebar-foreground) 70%, transparent)",
+                            }}
+                            strokeWidth={1.5}
+                          />
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>

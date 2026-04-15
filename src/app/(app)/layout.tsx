@@ -31,16 +31,42 @@ export default async function AppLayout({
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <AppSidebar branding={branding} canManageUsers={canManageUsers} />
-        <div className="flex flex-1 flex-col overflow-hidden w-full h-screen">
-          <TopHeader
-            branding={branding}
-            currentUser={currentUser}
-            summary={summary}
-            notifications={notifications}
-            unreadCount={unreadCount}
+        <div className="relative flex h-screen w-full flex-1 overflow-hidden" style={{ background: "var(--background)" }}>
+          <div
+            className="drift-orb"
+            data-orb="teal"
+            style={{
+              width: "400px",
+              height: "400px",
+              background: "rgba(29,158,117,0.12)",
+              top: "-120px",
+              right: "-80px",
+              animationDelay: "0s",
+            }}
           />
-          <main className="flex-1 overflow-y-auto bg-[#09090b] p-6 md:p-8">{children}</main>
+          <div
+            className="drift-orb"
+            data-orb="blue"
+            style={{
+              width: "300px",
+              height: "300px",
+              background: "rgba(55,138,221,0.09)",
+              bottom: "0",
+              left: "200px",
+              animationDelay: "-4s",
+            }}
+          />
+          <AppSidebar branding={branding} canManageUsers={canManageUsers} />
+          <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
+            <TopHeader
+              branding={branding}
+              currentUser={currentUser}
+              summary={summary}
+              notifications={notifications}
+              unreadCount={unreadCount}
+            />
+            <main className="flex-1 overflow-y-auto p-6 md:p-8">{children}</main>
+          </div>
         </div>
       </SidebarProvider>
     </TooltipProvider>

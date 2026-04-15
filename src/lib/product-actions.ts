@@ -9,6 +9,7 @@ import { createPasswordHash } from "@/lib/password";
 import { passwordPolicyMessage, validatePasswordPolicy } from "@/lib/password-policy";
 import { generateMfaSecret, verifyTotp } from "@/lib/mfa";
 import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit";
+import { encryptMfaSecret, decryptMfaSecret } from "@/lib/mfa-encryption";
 import { IntegrationService } from "@/lib/services/integration.service";
 import {
   clearMfaChallengeCookie,
@@ -121,7 +122,14 @@ export async function verifyMfaAction(formData: FormData) {
   }
 
   const { challenge } = challengeResult;
-  if (!challenge.user.mfaSecret || !verifyTotp(challenge.user.mfaSecret, code)) {
+  if (!challenge.user.mfaSecret) {
+    // Record failed MFA attempt
+    await recordLoginAttempt(`mfa-${code}`, false);
+    redirect("/verify-mfa?error=MFA%20not%20enrolled");
+  }
+  
+  const decryptedSecret = decryptMfaSecret(challenge.user.mfaSecret);
+  if (!verifyTotp(decryptedSecret, code)) {
     // Record failed MFA attempt
     await recordLoginAttempt(`mfa-${code}`, false);
     redirect("/verify-mfa?error=Invalid%20verification%20code");
@@ -728,7 +736,7 @@ export async function beginMfaEnrollmentAction() {
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      mfaSecret: secret,
+      mfaSecret: encryptMfaSecret(secret),
       mfaEnabled: false,
     },
   });
@@ -753,7 +761,8 @@ export async function confirmMfaEnrollmentAction(formData: FormData) {
     where: { id: session.user.id },
   });
 
-  const mfaSecret = assertPresent(currentUser?.mfaSecret, "/account", "No MFA enrollment is pending");
+  const encryptedSecret = assertPresent(currentUser?.mfaSecret, "/account", "No MFA enrollment is pending");
+  const mfaSecret = decryptMfaSecret(encryptedSecret);
 
   if (!verifyTotp(mfaSecret, code)) {
     redirectWithError("/account", "Invalid MFA code");
