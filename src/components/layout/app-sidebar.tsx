@@ -150,6 +150,18 @@ export function AppSidebar({ branding, canManageUsers = false }: { branding: Bra
                                 border: "0.5px solid transparent",
                               }
                         }
+                        onMouseEnter={(event) => {
+                          if (isActive) return;
+                          event.currentTarget.style.background = "color-mix(in srgb, var(--sidebar-accent) 100%, transparent)";
+                          event.currentTarget.style.borderColor = "color-mix(in srgb, var(--sidebar-border) 110%, transparent)";
+                          event.currentTarget.style.color = "color-mix(in srgb, var(--foreground) 76%, transparent)";
+                        }}
+                        onMouseLeave={(event) => {
+                          if (isActive) return;
+                          event.currentTarget.style.background = "transparent";
+                          event.currentTarget.style.borderColor = "transparent";
+                          event.currentTarget.style.color = "color-mix(in srgb, var(--sidebar-foreground) 82%, transparent)";
+                        }}
                       >
                         <Link href={item.url} className="flex items-center gap-2.5 w-full">
                           <item.icon

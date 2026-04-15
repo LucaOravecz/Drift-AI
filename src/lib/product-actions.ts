@@ -989,3 +989,33 @@ export async function acceptInviteAction(formData: FormData) {
 
   redirect("/sign-in");
 }
+
+export async function completeMeetingAction(meetingId: string) {
+  const session = await requireActiveSession();
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/v1/meetings/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ meetingId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    redirectWithError("/meetings", error.error || "Failed to complete meeting");
+  }
+
+  const result = await response.json();
+  
+  await AuditService.logAction({
+    organizationId: session.user.organizationId,
+    userId: session.user.id,
+    action: "MEETING_COMPLETED_VIA_ACTION",
+    target: `Meeting:${meetingId}`,
+    details: `Meeting completed and post-meeting workflow triggered. Tasks created: ${result.workflow?.tasksCreated || 0}, Opportunities detected: ${result.workflow?.opportunitiesDetected || 0}`,
+    severity: "INFO",
+  });
+
+  revalidatePath("/meetings");
+  revalidatePath(`/clients`);
+  redirect("/meetings?completed=1");
+}

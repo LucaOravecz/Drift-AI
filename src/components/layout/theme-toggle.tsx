@@ -4,18 +4,17 @@ import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(true);
-  const [mounted, setMounted] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("drift-theme");
+    return stored ? stored === "dark" : !document.documentElement.classList.contains("light");
+  });
 
   useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem("drift-theme");
-    const dark = stored ? stored === "dark" : true;
-    setIsDark(dark);
-    document.documentElement.classList.toggle("light", !dark);
-    document.documentElement.classList.toggle("dark", dark);
-    document.documentElement.style.colorScheme = dark ? "dark" : "light";
-  }, []);
+    document.documentElement.classList.toggle("light", !isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+  }, [isDark]);
 
   const toggle = () => {
     const next = !isDark;
@@ -25,8 +24,6 @@ export function ThemeToggle() {
     document.documentElement.classList.toggle("dark", next);
     document.documentElement.style.colorScheme = next ? "dark" : "light";
   };
-
-  if (!mounted) return null;
 
   return (
     <button
