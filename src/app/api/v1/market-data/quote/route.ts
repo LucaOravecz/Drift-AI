@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/middleware/api-auth";
 import { MarketDataService } from "@/lib/services/market-data.service";

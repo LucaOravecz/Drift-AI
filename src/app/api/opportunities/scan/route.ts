@@ -1,8 +1,17 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { detectClientOpportunities } from "@/lib/engines/opportunity.engine";
+import { authenticateApiRequest } from "@/lib/middleware/api-auth";
+import { AuditEventService } from "@/lib/services/audit-event.service";
 
 export async function POST(request: Request) {
+  const auth = await authenticateApiRequest();
+  if (!auth.authenticated || !auth.context) {
+    return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 });
+  }
+
   try {
     const body = await request.json();
     const { clientId } = body;
@@ -17,6 +26,10 @@ export async function POST(request: Request) {
 
     if (!client) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    if (client.organizationId !== auth.context.organizationId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const detected = await detectClientOpportunities(clientId);
@@ -55,16 +68,19 @@ export async function POST(request: Request) {
       created += 1;
     }
 
-    await prisma.auditLog.create({
-      data: {
-        organizationId: client.organizationId,
-        action: "DETERMINISTIC_OPPORTUNITY_SCAN_API",
-        target: `Client:${client.id}`,
-        details: created > 0
-          ? `Created ${created} grounded opportunity record(s) for ${client.name}.`
-          : `No new grounded opportunities triggered for ${client.name}.`,
-        severity: "INFO",
-        aiInvolved: false,
+    await AuditEventService.appendEvent({
+      organizationId: client.organizationId,
+      userId: auth.context.userId,
+      action: "DETERMINISTIC_OPPORTUNITY_SCAN_API",
+      target: `Client:${client.id}`,
+      targetId: client.id,
+      details: created > 0
+        ? `Created ${created} grounded opportunity record(s) for ${client.name}.`
+        : `No new grounded opportunities triggered for ${client.name}.`,
+      severity: "INFO",
+      aiInvolved: false,
+      metadata: {
+        opportunitiesDetected: created,
       },
     });
 

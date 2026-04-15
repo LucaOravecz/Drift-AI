@@ -1,6 +1,10 @@
+import "server-only";
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { DocumentService } from "@/lib/services/document.service";
+import { authenticateApiRequest } from "@/lib/middleware/api-auth";
+import { AuditEventService } from "@/lib/services/audit-event.service";
 
 /**
  * POST /api/documents/upload
@@ -13,6 +17,11 @@ import { DocumentService } from "@/lib/services/document.service";
  * 4. Stores document with metadata and extracted content
  */
 export async function POST(req: NextRequest) {
+  const auth = await authenticateApiRequest();
+  if (!auth.authenticated || !auth.context) {
+    return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 });
+  }
+
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
@@ -26,9 +35,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate client exists
-    const client = await prisma.client.findUnique({ where: { id: clientId } });
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, name: true, organizationId: true },
+    });
     if (!client) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    if (client.organizationId !== auth.context.organizationId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Convert file to buffer
@@ -70,14 +86,19 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const orgId = (await prisma.organization.findFirst())?.id ?? "";
-    await prisma.auditLog.create({
-      data: {
-        organizationId: orgId,
-        action: "DOCUMENT_UPLOADED",
-        target: `Document:${doc.id}`,
-        details: `Document "${file.name}" (${(file.size / 1_000_000).toFixed(2)} MB) uploaded for client ${client.name}. Type: ${documentType} (confidence: ${(typeInference.confidence * 100).toFixed(0)}%). Extracted ${extraction.keyPoints.length} key points, ${extraction.actionItems.length} action items, ${extraction.riskItems.length} risks.`,
-        severity: "INFO",
+    await AuditEventService.appendEvent({
+      organizationId: client.organizationId,
+      userId: auth.context.userId,
+      action: "DOCUMENT_UPLOADED",
+      target: `Document:${doc.id}`,
+      targetId: doc.id,
+      details: `Document "${file.name}" (${(file.size / 1_000_000).toFixed(2)} MB) uploaded for client ${client.name}. Type: ${documentType} (confidence: ${(typeInference.confidence * 100).toFixed(0)}%). Extracted ${extraction.keyPoints.length} key points, ${extraction.actionItems.length} action items, ${extraction.riskItems.length} risks.`,
+      severity: "INFO",
+      metadata: {
+        clientId: client.id,
+        fileName: file.name,
+        fileSize: file.size,
+        documentType,
       },
     });
 

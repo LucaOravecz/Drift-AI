@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { beginMfaEnrollmentAction, confirmMfaEnrollmentAction, disableMfaAction, revokeUserSessionAction, updateAccountAction } from "@/lib/product-actions";
 import { buildOtpAuthUrl } from "@/lib/mfa";
+import { decryptMfaSecret } from "@/lib/mfa-encryption";
 import { passwordPolicyMessage } from "@/lib/password-policy";
 
 interface AccountPageProps {
@@ -22,7 +23,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     where: { userId: session.user.id },
     orderBy: { lastSeenAt: "desc" },
   });
-  const otpAuthUrl = user?.mfaSecret ? buildOtpAuthUrl(user.email, "Drift OS", user.mfaSecret) : null;
+  const enrollmentSecret = user?.mfaSecret && !user.mfaEnabled ? decryptMfaSecret(user.mfaSecret) : null;
+  const otpAuthUrl = enrollmentSecret && user?.email ? buildOtpAuthUrl(user.email, "Drift OS", enrollmentSecret) : null;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -89,11 +91,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               <Button type="submit">Start MFA setup</Button>
             </form>
           ) : null}
-          {!user?.mfaEnabled && user?.mfaSecret ? (
+          {!user?.mfaEnabled && enrollmentSecret ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm text-zinc-300">
                 <div className="font-medium text-white/90">Manual secret</div>
-                <div className="mt-1 break-all font-mono text-xs text-zinc-400">{user.mfaSecret}</div>
+                <div className="mt-1 break-all font-mono text-xs text-zinc-400">{enrollmentSecret}</div>
               </div>
               {otpAuthUrl ? (
                 <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-zinc-400">

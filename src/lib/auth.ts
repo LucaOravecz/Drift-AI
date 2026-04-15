@@ -264,6 +264,11 @@ export async function completeMfaChallenge(code: string) {
   return { success: true as const, challenge };
 }
 
+export async function getMfaChallengeRateLimitKey() {
+  const challengeToken = (await cookies()).get(MFA_CHALLENGE_COOKIE_NAME)?.value;
+  return challengeToken ? `mfa:${challengeToken}` : "mfa:missing-challenge";
+}
+
 export async function signOutActiveSession() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token) return { shouldClearCookies: false };

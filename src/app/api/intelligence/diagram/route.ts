@@ -1,6 +1,14 @@
+import "server-only"
+
 import { generateIntelligenceEngineDiagram } from '@/lib/visualization-engine'
+import { authenticateApiRequest } from '@/lib/middleware/api-auth'
 
 export async function GET() {
+  const auth = await authenticateApiRequest()
+  if (!auth.authenticated) {
+    return new Response(JSON.stringify({ error: auth.error }), { status: auth.statusCode ?? 401 })
+  }
+
   try {
     const diagram = await generateIntelligenceEngineDiagram()
 

@@ -31,4 +31,16 @@ describe("RateLimiter", () => {
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(6);
   });
+
+  it("should reset a rate limit bucket", () => {
+    const key = "test:reset";
+    RateLimiter.check(key, 2);
+    RateLimiter.check(key, 2);
+
+    RateLimiter.reset(key);
+
+    const result = RateLimiter.check(key, 2);
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(1);
+  });
 });

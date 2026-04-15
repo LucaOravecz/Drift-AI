@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 import { BackgroundJobService } from "@/lib/services/background-jobs.service";
 
@@ -11,9 +13,14 @@ import { BackgroundJobService } from "@/lib/services/background-jobs.service";
  * Security: Protected by CRON_SECRET environment variable.
  */
 export async function POST(request: Request) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 503 });
+  }
+
   // Verify cron secret
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

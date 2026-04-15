@@ -1,3 +1,5 @@
+import 'server-only'
+
 import prisma from '@/lib/db'
 import { createHash } from 'crypto'
 
@@ -8,9 +10,9 @@ import { createHash } from 'crypto'
 type ModelTier = 'flagship' | 'standard' | 'economy'
 
 const MODEL_MAP: Record<ModelTier, string> = {
-  flagship: 'meta-llama/llama-3.1-8b-instruct',
-  standard: 'meta-llama/llama-3.1-8b-instruct',
-  economy:  'meta-llama/llama-3.1-8b-instruct',
+  flagship: 'claude-sonnet-4-20250514',
+  standard: 'claude-haiku-4-5-20251001',
+  economy:  'claude-haiku-4-5-20251001',
 }
 
 const DEFAULT_TIER: ModelTier = 'standard'
@@ -45,8 +47,10 @@ async function callOpenRouter(
   maxTokens: number,
 ): Promise<OpenRouterResponse> {
   const apiKey = process.env.OPENROUTER_API_KEY
-  console.log('OpenRouter API Key loaded:', apiKey ? 'YES' : 'NO (MISSING)')
-  console.log('API Key preview:', apiKey ? `${apiKey.substring(0, 15)}...` : 'NONE')
+
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY is not configured')
+  }
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -63,8 +67,6 @@ async function callOpenRouter(
     }),
   })
 
-  console.log('OpenRouter Response Status:', response.status)
-
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`OpenRouter API error: ${response.status} - ${error}`)
@@ -78,7 +80,8 @@ async function callOpenRouter(
 // ---------------------------------------------------------------------------
 
 const COST_PER_MILLION: Record<string, { input: number; output: number }> = {
-  'meta-llama/llama-3.1-8b-instruct': { input: 0, output: 0 }, // Free on OpenRouter
+  'claude-sonnet-4-20250514': { input: 0, output: 0 },
+  'claude-haiku-4-5-20251001': { input: 0, output: 0 },
 }
 
 function estimateCost(model: string, inputTokens: number, outputTokens: number): number {

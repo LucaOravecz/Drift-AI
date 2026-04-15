@@ -1,5 +1,7 @@
+import "server-only";
+
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession } from "@/lib/auth";
+import { authenticateApiRequest } from "@/lib/middleware/api-auth";
 import { ComplianceRuleManagementService } from "@/lib/services/compliance-rule-management.service";
 import prisma from "@/lib/db";
 
@@ -7,9 +9,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const session = await requireActiveSession();
+  const auth = await authenticateApiRequest();
+  if (!auth.authenticated || !auth.context) {
+    return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 });
+  }
 
+  try {
     // Verify rule belongs to user's organization
     const rule = await prisma.complianceRule.findUnique({
       where: { id: params.id }
@@ -22,7 +27,7 @@ export async function DELETE(
       );
     }
 
-    if (rule.organizationId !== session.user.organizationId) {
+    if (rule.organizationId !== auth.context.organizationId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
@@ -44,8 +49,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = await authenticateApiRequest();
+  if (!auth.authenticated || !auth.context) {
+    return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 });
+  }
+
   try {
-    const session = await requireActiveSession();
     const body = await request.json();
 
     // Verify rule belongs to user's organization
@@ -60,7 +69,7 @@ export async function PATCH(
       );
     }
 
-    if (rule.organizationId !== session.user.organizationId) {
+    if (rule.organizationId !== auth.context.organizationId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }

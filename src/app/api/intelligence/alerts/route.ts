@@ -1,32 +1,34 @@
+import "server-only"
+
 import prisma from '@/lib/db'
-import { getSecurityContextFromSession } from '@/lib/auth'
+import { authenticateApiRequest } from '@/lib/middleware/api-auth'
 
 export async function GET(request: Request) {
-  try {
-    const ctx = await getSecurityContextFromSession()
-    if (!ctx) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
+  const auth = await authenticateApiRequest()
+  if (!auth.authenticated || !auth.context) {
+    return new Response(JSON.stringify({ error: auth.error }), { status: auth.statusCode ?? 401 })
+  }
 
+  try {
     // Fetch priority alerts (churn, opportunities, compliance, onboarding blocks)
     const [churnFlags, opportunities, complianceFlags, blockedOnboarding] = await Promise.all([
       prisma.client.findMany({
-        where: { organizationId: ctx.organizationId, churnScore: { gte: 70 } },
+        where: { organizationId: auth.context.organizationId, churnScore: { gte: 70 } },
         select: { id: true, name: true, churnScore: true },
         take: 3,
       }),
       prisma.opportunity.findMany({
-        where: { client: { organizationId: ctx.organizationId }, status: 'DRAFT' },
+        where: { client: { organizationId: auth.context.organizationId }, status: 'DRAFT' },
         select: { id: true, clientId: true, type: true, valueEst: true, description: true },
         take: 3,
       }),
       prisma.complianceFlag.findMany({
-        where: { organizationId: ctx.organizationId, status: { in: ['OPEN', 'ESCALATED'] } },
+        where: { organizationId: auth.context.organizationId, status: { in: ['OPEN', 'ESCALATED'] } },
         select: { id: true, type: true, severity: true, description: true, target: true },
         take: 3,
       }),
       prisma.onboardingWorkflow.findMany({
-        where: { client: { organizationId: ctx.organizationId }, stage: 'BLOCKED' },
+        where: { client: { organizationId: auth.context.organizationId }, stage: 'BLOCKED' },
         select: { id: true, clientId: true, notes: true },
         take: 3,
       }),

@@ -1,4 +1,7 @@
+import "server-only"
+
 import { NextRequest, NextResponse } from 'next/server'
+import { authenticateApiRequest } from '@/lib/middleware/api-auth'
 import {
   generateChart,
   generateAllocationChart,
@@ -13,6 +16,11 @@ import {
  */
 
 export async function POST(request: NextRequest) {
+  const auth = await authenticateApiRequest()
+  if (!auth.authenticated || !auth.context) {
+    return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
+  }
+
   try {
     const body = await request.json()
     const { type, data, title, description, clientName } = body
@@ -86,6 +94,11 @@ export async function POST(request: NextRequest) {
  * Example: /api/visualizations?type=chart&format=json
  */
 export async function GET(request: NextRequest) {
+  const auth = await authenticateApiRequest()
+  if (!auth.authenticated || !auth.context) {
+    return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
+  }
+
   const searchParams = request.nextUrl.searchParams
   const type = searchParams.get('type')
 

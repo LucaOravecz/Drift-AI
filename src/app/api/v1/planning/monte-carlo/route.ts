@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth";
 import { FinancialPlanningService } from "@/lib/services/financial-planning.service";

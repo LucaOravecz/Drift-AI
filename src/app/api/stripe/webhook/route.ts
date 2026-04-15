@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { BillingService } from "@/lib/services/billing.service";
@@ -11,6 +13,10 @@ const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
  * Verifies the webhook signature using STRIPE_WEBHOOK_SECRET.
  */
 export async function POST(request: Request) {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 });
+  }
+
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -60,7 +66,8 @@ export async function POST(request: Request) {
         break;
 
       default:
-        console.log(`Unhandled Stripe event: ${event.type}`);
+        // Ignore unhandled events without emitting noisy production logs.
+        break;
     }
 
     return NextResponse.json({ received: true });

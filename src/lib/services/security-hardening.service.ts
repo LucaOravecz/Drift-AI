@@ -97,6 +97,10 @@ export class RateLimiter {
   static checkByApiKey(keyPrefix: string, limit = 100): RateLimitResult {
     return this.check(`apikey:${keyPrefix}`, limit);
   }
+
+  static reset(key: string): void {
+    rateLimitStore.delete(key);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ import {
   clearSessionCookie,
   completeMfaChallenge,
   createSessionForUser,
+  getMfaChallengeRateLimitKey,
   requireActiveSession,
   getSecurityContextFromSession,
   signInWithPassword,
@@ -63,7 +64,7 @@ export async function signInAction(formData: FormData) {
   }
 
   // Check rate limit
-  const rateLimit = await checkRateLimit(email);
+  const rateLimit = await checkRateLimit(`sign-in:${email}`);
   if (!rateLimit.allowed) {
     const minutes = Math.ceil((rateLimit.remainingMs || 900000) / 60000);
     redirect(`/sign-in?error=${encodeURIComponent(`Too many attempts. Try again in ${minutes} minutes.`)}`);
@@ -72,7 +73,7 @@ export async function signInAction(formData: FormData) {
   const result = await signInWithPassword(email, password);
   
   // Record login attempt
-  await recordLoginAttempt(email, result.success);
+  await recordLoginAttempt(`sign-in:${email}`, result.success);
 
   if (!result.success) {
     redirect(`/sign-in?error=${encodeURIComponent(result.error)}`);
@@ -103,9 +104,10 @@ export async function signOutAction() {
 
 export async function verifyMfaAction(formData: FormData) {
   const code = sanitize(formData.get("code"));
+  const rateLimitKey = await getMfaChallengeRateLimitKey();
   
   // Check MFA rate limit by challenge ID
-  const rateLimit = await checkRateLimit(`mfa-${code}`);
+  const rateLimit = await checkRateLimit(rateLimitKey);
   if (!rateLimit.allowed) {
     const minutes = Math.ceil((rateLimit.remainingMs || 900000) / 60000);
     redirect(`/verify-mfa?error=${encodeURIComponent(`Too many attempts. Try again in ${minutes} minutes.`)}`);
@@ -117,26 +119,26 @@ export async function verifyMfaAction(formData: FormData) {
       await clearMfaChallengeCookie();
     }
     // Record failed MFA attempt
-    await recordLoginAttempt(`mfa-${code}`, false);
+    await recordLoginAttempt(rateLimitKey, false);
     redirect(`/verify-mfa?error=${encodeURIComponent(challengeResult.error)}`);
   }
 
   const { challenge } = challengeResult;
   if (!challenge.user.mfaSecret) {
     // Record failed MFA attempt
-    await recordLoginAttempt(`mfa-${code}`, false);
+    await recordLoginAttempt(rateLimitKey, false);
     redirect("/verify-mfa?error=MFA%20not%20enrolled");
   }
   
   const decryptedSecret = decryptMfaSecret(challenge.user.mfaSecret);
   if (!verifyTotp(decryptedSecret, code)) {
     // Record failed MFA attempt
-    await recordLoginAttempt(`mfa-${code}`, false);
+    await recordLoginAttempt(rateLimitKey, false);
     redirect("/verify-mfa?error=Invalid%20verification%20code");
   }
   
   // Record successful MFA attempt
-  await recordLoginAttempt(`mfa-${code}`, true);
+  await recordLoginAttempt(rateLimitKey, true);
 
   await prisma.pendingLoginChallenge.delete({ where: { id: challenge.id } }).catch(() => null);
   await clearMfaChallengeCookie();
@@ -473,13 +475,22 @@ export async function completeInitialPasswordSetupAction(formData: FormData) {
   const session = await requireActiveSession();
   const password = sanitize(formData.get("password"));
   const confirmPassword = sanitize(formData.get("confirmPassword"));
+  const rateLimitKey = `password-reset:${session.user.id}`;
+
+  const rateLimit = await checkRateLimit(rateLimitKey);
+  if (!rateLimit.allowed) {
+    const minutes = Math.ceil((rateLimit.remainingMs || 900000) / 60000);
+    redirectWithError("/reset-password", `Too many attempts. Try again in ${minutes} minutes.`);
+  }
 
   const validation = validatePasswordPolicy(password);
   if (!password || !validation.isValid) {
+    await recordLoginAttempt(rateLimitKey, false);
     redirectWithError("/reset-password", passwordPolicyMessage());
   }
 
   if (password !== confirmPassword) {
+    await recordLoginAttempt(rateLimitKey, false);
     redirect("/reset-password?error=Passwords%20do%20not%20match");
   }
 
@@ -508,6 +519,8 @@ export async function completeInitialPasswordSetupAction(formData: FormData) {
     "Your password was updated and your account is ready to use.",
     "/account"
   );
+
+  await recordLoginAttempt(rateLimitKey, true);
 
   revalidatePath("/");
   redirect("/");
