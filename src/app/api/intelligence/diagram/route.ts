@@ -1,12 +1,16 @@
 import "server-only"
 
 import { generateIntelligenceEngineDiagram } from '@/lib/visualization-engine'
-import { authenticateApiRequest } from '@/lib/middleware/api-auth'
+import { authenticateApiRequest, hasPermission } from '@/lib/middleware/api-auth'
 
 export async function GET() {
   const auth = await authenticateApiRequest()
-  if (!auth.authenticated) {
+  if (!auth.authenticated || !auth.context) {
     return new Response(JSON.stringify({ error: auth.error }), { status: auth.statusCode ?? 401 })
+  }
+
+  if (!hasPermission(auth.context, 'read', 'intelligence')) {
+    return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403 })
   }
 
   try {

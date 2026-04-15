@@ -6,10 +6,17 @@ import { getBranding } from "@/lib/app-shell";
 import Link from "next/link";
 import prisma from "@/lib/db";
 import { IntegrationService } from "@/lib/services/integration.service";
-import { createManagedUserAction, resetManagedUserPasswordAction, setManagedUserStatusAction, updateIntegrationSettingsAction, updateSettingsAction } from "@/lib/product-actions";
+import {
+  createManagedUserAction,
+  resetManagedUserPasswordAction,
+  setManagedUserStatusAction,
+  updateIntegrationSettingsAction,
+  updateOrgOperationalSettingsAction,
+  updateSettingsAction,
+} from "@/lib/product-actions";
 
 interface SettingsPageProps {
-  searchParams: Promise<{ saved?: string; userSaved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; orgOpsSaved?: string; userSaved?: string; error?: string }>;
 }
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
@@ -38,11 +45,23 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <p className="mt-1 text-sm text-zinc-400">
           Branding and notification preferences are stored in the database and immediately reflected in the protected shell.
         </p>
+        <p className="mt-2 text-xs text-zinc-500">
+          Public disclosure:{" "}
+          <Link href="/subprocessors" className="text-emerald-400/90 underline-offset-4 hover:underline">
+            Subprocessors
+          </Link>
+        </p>
       </div>
 
       {params.saved ? (
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
           Settings saved.
+        </div>
+      ) : null}
+
+      {params.orgOpsSaved ? (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+          Operational controls saved (AI, read-only, sync drift threshold).
         </div>
       ) : null}
 
@@ -198,6 +217,64 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </form>
         </CardContent>
       </Card>
+
+      {canManageUsers ? (
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader>
+            <CardTitle className="text-white/90">Operational controls</CardTitle>
+            <CardDescription>
+              Firm-wide switches for AI-assisted features, trading writes, and custodian sync drift hints. Requires admin or
+              senior advisor access.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={updateOrgOperationalSettingsAction} className="space-y-6">
+              <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3">
+                <input
+                  name="aiFeaturesEnabled"
+                  type="checkbox"
+                  defaultChecked={organizationSettings?.aiFeaturesEnabled ?? true}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="text-sm font-medium text-white/85">AI features enabled</span>
+                  <span className="mt-1 block text-xs text-zinc-500">
+                    When off, copilot, structured LLM extraction, and NLP-heavy compliance scans are blocked or use
+                    non-LLM fallbacks.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3">
+                <input name="readOnlyMode" type="checkbox" defaultChecked={organizationSettings?.readOnlyMode ?? false} className="mt-1" />
+                <span>
+                  <span className="text-sm font-medium text-white/85">Read-only mode</span>
+                  <span className="mt-1 block text-xs text-zinc-500">
+                    Blocks custodian trade submission and OMS order writes. Other workflows remain available for review.
+                  </span>
+                </span>
+              </label>
+              <div className="space-y-2">
+                <label className="text-sm text-zinc-300" htmlFor="syncDriftAlertBps">
+                  Custodian sync drift alert (basis points)
+                </label>
+                <Input
+                  id="syncDriftAlertBps"
+                  name="syncDriftAlertBps"
+                  type="number"
+                  min={1}
+                  max={5000}
+                  defaultValue={organizationSettings?.syncDriftAlertBps ?? 50}
+                  className="max-w-xs border-white/10 bg-white/5"
+                />
+                <p className="text-xs text-zinc-500">
+                  Compared to client AUM after sync; default 50 = 0.5%. Whole basis points (1–5000).
+                </p>
+              </div>
+              <Button type="submit">Save operational controls</Button>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {canManageUsers ? (
         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">

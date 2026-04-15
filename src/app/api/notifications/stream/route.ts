@@ -1,7 +1,6 @@
 import "server-only";
 
-import { getActiveSession } from "@/lib/auth";
-import { authenticateApiRequest } from "@/lib/middleware/api-auth";
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth";
 import { SSENotificationService } from "@/lib/services/sse-notification.service";
 
 /**
@@ -18,14 +17,17 @@ export async function GET() {
     return new Response("Unauthorized", { status: auth.statusCode ?? 401 });
   }
 
-  const session = await getActiveSession();
-  if (!session || session.user.id !== auth.context.userId) {
-    return new Response("Unauthorized", { status: 401 });
+  if (auth.context.authMethod !== "SESSION" || !auth.context.userId) {
+    return new Response("Session required for notification stream", { status: 403 });
+  }
+
+  if (!hasPermission(auth.context, "read", "notifications")) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   const stream = SSENotificationService.createStream(
-    session.user.id,
-    session.user.organizationId,
+    auth.context.userId,
+    auth.context.organizationId,
   );
 
   return new Response(stream, {
@@ -33,7 +35,6 @@ export async function GET() {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // Disable nginx buffering
     },
   });
 }

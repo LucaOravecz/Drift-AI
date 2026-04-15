@@ -19,23 +19,31 @@ export async function POST(request: Request) {
 
   const body = await request.json();
 
-  const result = await TradingOMSService.submitOrder(
-    {
-      clientId: body.clientId,
-      accountId: body.accountId,
-      organizationId: auth.context.organizationId,
-      ticker: body.ticker,
-      side: body.side,
-      orderType: body.orderType ?? "MARKET",
-      quantity: body.quantity,
-      limitPrice: body.limitPrice,
-      timeInForce: body.timeInForce ?? "DAY",
-      custodian: body.custodian ?? "SCHWAB",
-      advisorId: auth.context.userId ?? "",
-      reason: body.reason ?? "API order submission",
-    },
-    auth.context.userId ?? "",
-  );
+  try {
+    const result = await TradingOMSService.submitOrder(
+      {
+        clientId: body.clientId,
+        accountId: body.accountId,
+        organizationId: auth.context.organizationId,
+        ticker: body.ticker,
+        side: body.side,
+        orderType: body.orderType ?? "MARKET",
+        quantity: body.quantity,
+        limitPrice: body.limitPrice,
+        timeInForce: body.timeInForce ?? "DAY",
+        custodian: body.custodian ?? "SCHWAB",
+        advisorId: auth.context.userId ?? "",
+        reason: body.reason ?? "API order submission",
+      },
+      auth.context.userId ?? "",
+    );
 
-  return NextResponse.json({ data: result });
+    return NextResponse.json({ data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("read-only")) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    throw err;
+  }
 }

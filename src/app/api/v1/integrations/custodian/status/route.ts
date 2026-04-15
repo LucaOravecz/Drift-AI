@@ -1,6 +1,6 @@
 import "server-only"
 import { NextResponse } from "next/server"
-import { authenticateApiRequest } from "@/lib/middleware/api-auth"
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth"
 import prisma from "@/lib/db"
 
 /**
@@ -10,12 +10,16 @@ import prisma from "@/lib/db"
  */
 export async function GET(req: Request) {
   const auth = await authenticateApiRequest()
-  if (!auth.authenticated) {
+  if (!auth.authenticated || !auth.context) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
   }
 
+  if (!hasPermission(auth.context, "read", "custodian_integrations")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
+  }
+
   try {
-    const organizationId = auth.context!.organizationId
+    const organizationId = auth.context.organizationId
 
     const integrations = await prisma.integrationConfig.findMany({
       where: {

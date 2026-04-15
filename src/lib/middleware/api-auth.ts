@@ -2,8 +2,11 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { ApiKeyService } from "../services/api-key.service";
-import { RateLimiter, CsrfProtection, IpAllowlist } from "../services/security-hardening.service";
+import { IpAllowlist } from "../services/security-hardening.service";
 import { getActiveSession } from "../auth";
+import { roleHasAllCapabilities } from "../services/security.service";
+import { requiredCapabilitiesForApiResource } from "./api-resource-permissions";
+import { limitByUser } from "../services/distributed-rate-limiter";
 
 /**
  * API Authentication Middleware
@@ -18,6 +21,8 @@ import { getActiveSession } from "../auth";
 export interface AuthContext {
   organizationId: string;
   userId?: string;
+  /** Present for session auth — used for fine-grained API RBAC */
+  role?: string;
   authMethod: "SESSION" | "API_KEY";
   apiKeyId?: string;
   permissions?: Record<string, unknown>;
@@ -75,8 +80,7 @@ export async function authenticateApiRequest(): Promise<AuthResult> {
   // 2. Try session authentication
   const session = await getActiveSession();
   if (session) {
-    // Rate limit by user
-    const rateLimit = RateLimiter.checkByUser(session.user.id);
+    const rateLimit = await limitByUser(session.user.id);
     if (!rateLimit.allowed) {
       return {
         authenticated: false,
@@ -90,6 +94,7 @@ export async function authenticateApiRequest(): Promise<AuthResult> {
       context: {
         organizationId: session.user.organizationId,
         userId: session.user.id,
+        role: session.user.role,
         authMethod: "SESSION",
       },
     };
@@ -104,21 +109,34 @@ export async function authenticateApiRequest(): Promise<AuthResult> {
 
 /**
  * Check if the authenticated context has the required permission.
+ * Session users are gated by institutional role; API keys use scoped permissions JSON.
  */
 export function hasPermission(
   context: AuthContext,
   action: "read" | "write",
   resource: string,
 ): boolean {
-  // Session auth has full permissions (gated by role elsewhere)
-  if (context.authMethod === "SESSION") return true;
+  if (context.authMethod === "API_KEY") {
+    const perms = context.permissions as Record<string, string[]> | undefined;
+    if (!perms) return false;
 
-  // API key auth checks the permissions object
-  const perms = context.permissions as Record<string, string[]> | undefined;
-  if (!perms) return false;
+    const allowed = perms[action];
+    if (!Array.isArray(allowed)) return false;
 
-  const allowed = perms[action];
-  if (!Array.isArray(allowed)) return false;
+    const resourceAliases =
+      resource === "custodian_integrations" ? [resource, "integrations"] : [resource];
+    return (
+      allowed.includes("*") ||
+      resourceAliases.some((r) => allowed.includes(r))
+    );
+  }
 
-  return allowed.includes(resource) || allowed.includes("*");
+  if (context.authMethod === "SESSION") {
+    if (!context.role) return false;
+    const required = requiredCapabilitiesForApiResource(action, resource);
+    if (!required) return false;
+    return roleHasAllCapabilities(context.role, required);
+  }
+
+  return false;
 }

@@ -2,6 +2,22 @@ import { expect, request, test } from "@playwright/test";
 
 const storageStatePath = "playwright/.auth/admin.json";
 
+test.describe("public api smoke", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "API smoke only needs one browser project.");
+
+  test("health route is reachable without auth", async () => {
+    const api = await request.newContext({
+      baseURL: "http://127.0.0.1:3000",
+    });
+    const health = await api.get("/api/health");
+    expect(health.ok()).toBe(true);
+    const body = await health.json();
+    expect(body.ok).toBe(true);
+    expect(body.database).toBe("up");
+    await api.dispose();
+  });
+});
+
 test.describe("authenticated api smoke", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "API smoke only needs one browser project.");
 
@@ -46,6 +62,19 @@ test.describe("authenticated api smoke", () => {
     const roiResponse = await api.get("/api/v1/dashboard/roi-report");
     expect(roiResponse.ok()).toBe(true);
     expect(roiResponse.headers()["content-type"]).toContain("application/pdf");
+
+    const orgSettingsResponse = await api.get("/api/admin/organization/settings");
+    expect(orgSettingsResponse.ok()).toBe(true);
+    const orgSettingsJson = await orgSettingsResponse.json();
+    expect(typeof orgSettingsJson.data.aiFeaturesEnabled).toBe("boolean");
+    expect(typeof orgSettingsJson.data.readOnlyMode).toBe("boolean");
+    expect(typeof orgSettingsJson.data.syncDriftAlertBps).toBe("number");
+
+    const exportResponse = await api.get(`/api/v1/admin/clients/${firstClientId}/export`);
+    expect(exportResponse.ok()).toBe(true);
+    const exportJson = await exportResponse.json();
+    expect(exportJson.client?.id).toBe(firstClientId);
+    expect(exportJson.schemaVersion).toBe(1);
 
     await api.dispose();
   });

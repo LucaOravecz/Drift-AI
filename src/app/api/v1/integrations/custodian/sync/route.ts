@@ -1,8 +1,9 @@
 import "server-only"
 import { NextResponse } from "next/server"
-import { authenticateApiRequest } from "@/lib/middleware/api-auth"
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth"
 import { CustodianIntegrationService } from "@/lib/services/custodian-integration.service"
 import { AuditService } from "@/lib/services/audit.service"
+import { SyncDriftHintService } from "@/lib/services/sync-drift-hint.service"
 
 /**
  * POST /api/v1/integrations/custodian/sync
@@ -11,13 +12,20 @@ import { AuditService } from "@/lib/services/audit.service"
  */
 export async function POST(req: Request) {
   const auth = await authenticateApiRequest()
-  if (!auth.authenticated) {
+  if (!auth.authenticated || !auth.context) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
   }
 
+  if (!hasPermission(auth.context, "write", "custodian_integrations")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
+  }
+
   try {
-    const organizationId = auth.context!.organizationId
-    const userId = auth.context!.userId
+    const organizationId = auth.context.organizationId
+    const userId = auth.context.userId
+
+    const body = await req.json().catch(() => ({} as Record<string, unknown>))
+    const driftClientId = typeof body.clientId === "string" ? body.clientId : undefined
 
     const results = await CustodianIntegrationService.syncAllPositions(organizationId)
 
@@ -36,9 +44,15 @@ export async function POST(req: Request) {
       severity: "INFO",
     })
 
+    let driftHint = null as Awaited<ReturnType<typeof SyncDriftHintService.evaluateClient>> | null
+    if (driftClientId) {
+      driftHint = await SyncDriftHintService.evaluateClient(driftClientId, organizationId)
+    }
+
     return NextResponse.json({
       success: true,
       results,
+      driftHint,
       summary: {
         custodiansSynced: results.length,
         totalPositionsUpdated: results.reduce((sum, r) => sum + r.positionsUpdated, 0),

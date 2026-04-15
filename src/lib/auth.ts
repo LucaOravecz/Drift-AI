@@ -116,7 +116,12 @@ async function createPersistedSession(userId: string, expiresAt: Date) {
 }
 
 export async function createSessionForUser(userId: string) {
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  const ttlDays = user?.role === "READ_ONLY" ? 1 : SESSION_TTL_DAYS;
+  const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
   const { session, token } = await createPersistedSession(userId, expiresAt);
   return { session, token, expiresAt };
 }

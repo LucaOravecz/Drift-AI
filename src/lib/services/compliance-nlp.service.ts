@@ -1,6 +1,7 @@
 import "server-only";
 
 import prisma from "@/lib/db";
+import { OrgOperationalSettings } from "@/lib/org-operational-settings";
 import { AuditEventService } from "./audit-event.service";
 import { callClaude, type FeatureRoute } from "./ai.service";
 
@@ -39,7 +40,7 @@ const DETERMINISTIC_PATTERNS: CompliancePattern[] = [
   {
     id: "risky_guarantee",
     category: "RISKY_WORDING",
-    pattern: /\b(guarantee|guaranteed)\b/i,
+    pattern: /\b(guarantee|guaranteed|guarantees)\b/i,
     description: "Use of 'guarantee' — prohibited under FINRA Rule 2210",
     severity: "HIGH",
     regulatoryReference: "FINRA Rule 2210",
@@ -129,7 +130,7 @@ const DETERMINISTIC_PATTERNS: CompliancePattern[] = [
   {
     id: "ad_rule_performance_claim",
     category: "AD_RULE",
-    pattern: /\b(\d+%\s+(return|gain|profit|yield|performance))\b/i,
+    pattern: /\b(\d+%\s+(return|returns|gain|gains|profit|profits|yield|yields|performance))\b/i,
     description: "Specific performance claim — requires disclosure and substantiation under Advertising Rule",
     severity: "HIGH",
     regulatoryReference: "SEC Rule 206(4)-1(a)(2)",
@@ -188,18 +189,27 @@ export class ComplianceNLPService {
     const hits: ComplianceHit[] = [];
 
     for (const pattern of DETERMINISTIC_PATTERNS) {
-      const match = pattern.pattern.exec(text);
-      if (match) {
-        hits.push({
-          patternId: pattern.id,
-          category: pattern.category,
-          matchedText: match[0],
-          description: pattern.description,
-          severity: pattern.severity,
-          regulatoryReference: pattern.regulatoryReference,
-          source: "DETERMINISTIC",
-        });
+      const regex = new RegExp(pattern.pattern.source, pattern.pattern.flags);
+      const match = regex.exec(text);
+      if (!match || match.index === undefined) continue;
+
+      if (pattern.id === "risky_guarantee") {
+        const ctxStart = Math.max(0, match.index - 20);
+        const ctx = text.slice(ctxStart, match.index + match[0].length).toLowerCase();
+        if (/\b(does|do)\s+not\s+guarantee\b/.test(ctx) || /\bcannot\s+guarantee\b/.test(ctx)) {
+          continue;
+        }
       }
+
+      hits.push({
+        patternId: pattern.id,
+        category: pattern.category,
+        matchedText: match[0],
+        description: pattern.description,
+        severity: pattern.severity,
+        regulatoryReference: pattern.regulatoryReference,
+        source: "DETERMINISTIC",
+      });
     }
 
     return hits;
@@ -365,7 +375,9 @@ Be conservative — only flag genuine compliance risks, not cautious language.`;
 
     // 3. AI NLP scan (optional, for high-value scans)
     let aiAnalysis: string | undefined;
-    if (runNlp) {
+    const orgFlags = await OrgOperationalSettings.get(organizationId);
+    const allowNlp = runNlp && orgFlags.aiFeaturesEnabled;
+    if (allowNlp) {
       const nlpResult = await this.nlpScan(text, organizationId, userId);
       hits = [...hits, ...nlpResult.hits];
       aiAnalysis = nlpResult.analysis;

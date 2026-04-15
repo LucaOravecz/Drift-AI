@@ -1,6 +1,7 @@
 import 'server-only'
 
 import prisma from '@/lib/db'
+import { OrgOperationalSettings } from '@/lib/org-operational-settings'
 import { createHash } from 'crypto'
 
 // ---------------------------------------------------------------------------
@@ -79,9 +80,10 @@ async function callOpenRouter(
 // Cost tracking helpers
 // ---------------------------------------------------------------------------
 
+/** Approximate OpenRouter / Anthropic-class pricing (USD per 1M tokens). Tune from provider dashboards. */
 const COST_PER_MILLION: Record<string, { input: number; output: number }> = {
-  'claude-sonnet-4-20250514': { input: 0, output: 0 },
-  'claude-haiku-4-5-20251001': { input: 0, output: 0 },
+  'claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
+  'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0 },
 }
 
 function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
@@ -215,6 +217,8 @@ export async function callClaude(
   let requestId: string | undefined
 
   try {
+    await OrgOperationalSettings.assertAiEnabled(options.organizationId)
+
     const response = await withRetry(() =>
       callOpenRouter(model, [
         { role: 'user', content: `${systemPrompt}\n\n${userMessage}` },
@@ -279,6 +283,8 @@ export async function callClaudeStructured<T>(
   let requestId: string | undefined
 
   try {
+    await OrgOperationalSettings.assertAiEnabled(options.organizationId)
+
     const schemaInstructions = schemaToInstructions(options.schema)
     const enhancedPrompt = `${systemPrompt}\n\nIMPORTANT: Return ONLY valid JSON. No markdown, no code blocks, no explanations, no extra text.\nRequired schema:\n${schemaInstructions}\n\nStart with { or [ and end with } or ]. Output valid JSON only.`
 
@@ -381,6 +387,8 @@ export async function streamClaude(
   let fullText = ''
 
   try {
+    await OrgOperationalSettings.assertAiEnabled(options.organizationId)
+
     const response = await withRetry(() =>
       callOpenRouter(model, [
         { role: 'user', content: `${systemPrompt}\n\n${userMessage}` },

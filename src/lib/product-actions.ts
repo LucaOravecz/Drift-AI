@@ -11,6 +11,7 @@ import { generateMfaSecret, verifyTotp } from "@/lib/mfa";
 import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit";
 import { encryptMfaSecret, decryptMfaSecret } from "@/lib/mfa-encryption";
 import { IntegrationService } from "@/lib/services/integration.service";
+import { MeetingWorkflowService } from "@/lib/services/meeting-workflow.service";
 import {
   clearMfaChallengeCookie,
   clearSessionCookie,
@@ -385,6 +386,78 @@ export async function updateIntegrationSettingsAction(formData: FormData) {
   revalidatePath("/settings");
   revalidatePath("/admin/users");
   redirect("/settings?saved=1");
+}
+
+export async function updateOrgOperationalSettingsAction(formData: FormData) {
+  const session = await requireActiveSession();
+  const ctx = await getSecurityContextFromSession();
+  if (!ctx) redirect("/sign-in");
+  await SecurityService.enforceAccess(ctx, "USER_MANAGE", "OrgOperationalSettings");
+
+  const before = await prisma.organizationSettings.findUnique({
+    where: { organizationId: session.user.organizationId },
+    select: {
+      aiFeaturesEnabled: true,
+      readOnlyMode: true,
+      syncDriftAlertBps: true,
+    },
+  });
+
+  const aiFeaturesEnabled = formData.get("aiFeaturesEnabled") === "on";
+  const readOnlyMode = formData.get("readOnlyMode") === "on";
+  const bpsRaw = sanitize(formData.get("syncDriftAlertBps"));
+  const parsedBps = bpsRaw ? Number.parseInt(bpsRaw, 10) : NaN;
+  const syncDriftAlertBps =
+    Number.isFinite(parsedBps) && parsedBps >= 1 && parsedBps <= 5000
+      ? parsedBps
+      : (before?.syncDriftAlertBps ?? 50);
+
+  await prisma.organizationSettings.upsert({
+    where: { organizationId: session.user.organizationId },
+    update: {
+      aiFeaturesEnabled,
+      readOnlyMode,
+      syncDriftAlertBps,
+    },
+    create: {
+      organizationId: session.user.organizationId,
+      aiFeaturesEnabled,
+      readOnlyMode,
+      syncDriftAlertBps,
+    },
+  });
+
+  await AuditService.logAction({
+    organizationId: session.user.organizationId,
+    userId: session.user.id,
+    action: "ORG_OPERATIONAL_SETTINGS_UPDATED",
+    target: `Organization:${session.user.organizationId}`,
+    beforeState: before
+      ? {
+          aiFeaturesEnabled: before.aiFeaturesEnabled,
+          readOnlyMode: before.readOnlyMode,
+          syncDriftAlertBps: before.syncDriftAlertBps,
+        }
+      : null,
+    afterState: {
+      aiFeaturesEnabled,
+      readOnlyMode,
+      syncDriftAlertBps,
+    },
+    details: "Operational flags updated from settings (AI, read-only, sync drift threshold).",
+    severity: "INFO",
+  });
+
+  await createUserNotification(
+    session.user.id,
+    session.user.organizationId,
+    "Operational settings saved",
+    "AI features, read-only mode, or custodian sync drift alert threshold were updated.",
+    "/settings"
+  );
+
+  revalidatePath("/settings");
+  redirect("/settings?orgOpsSaved=1");
 }
 
 export async function markNotificationReadAction(formData: FormData) {
@@ -1005,26 +1078,29 @@ export async function acceptInviteAction(formData: FormData) {
 
 export async function completeMeetingAction(meetingId: string) {
   const session = await requireActiveSession();
-
-  const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/v1/meetings/complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ meetingId }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    redirectWithError("/meetings", error.error || "Failed to complete meeting");
+  let result: Awaited<ReturnType<typeof MeetingWorkflowService.completeMeeting>> | null = null;
+  try {
+    result = await MeetingWorkflowService.completeMeeting({
+      organizationId: session.user.organizationId,
+      userId: session.user.id,
+      meetingId,
+    });
+  } catch (error) {
+    redirectWithError("/meetings", error instanceof Error ? error.message : "Failed to complete meeting");
   }
 
-  const result = await response.json();
+  if (!result) {
+    redirectWithError("/meetings", "Failed to complete meeting");
+  }
+
+  const workflowResult = result!;
   
   await AuditService.logAction({
     organizationId: session.user.organizationId,
     userId: session.user.id,
     action: "MEETING_COMPLETED_VIA_ACTION",
     target: `Meeting:${meetingId}`,
-    details: `Meeting completed and post-meeting workflow triggered. Tasks created: ${result.workflow?.tasksCreated || 0}, Opportunities detected: ${result.workflow?.opportunitiesDetected || 0}`,
+    details: `Meeting completed and post-meeting workflow triggered. Tasks created: ${workflowResult.workflow.tasksCreated || 0}, Opportunities detected: ${workflowResult.workflow.opportunitiesDetected || 0}`,
     severity: "INFO",
   });
 

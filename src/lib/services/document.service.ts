@@ -299,15 +299,15 @@ Extract 3-5 key facts, 3-5 action items, and 2-3 risks. Be specific to the actua
    */
   static async extractPDFContent(fileBuffer: Buffer): Promise<string> {
     try {
-      const pdfParse = require('pdf-parse');
-      const data = await pdfParse(fileBuffer);
-      
-      // Extract text from all pages, with page breaks
-      const text = data.text || '';
-      return text.trim().substring(0, 10000); // Limit to 10k chars for API
+      const { PDFParse } = await import('pdf-parse')
+      const parser = new PDFParse({ data: new Uint8Array(fileBuffer) })
+      const textResult = await parser.getText()
+      await parser.destroy()
+      const text = textResult.text ?? ''
+      return text.trim().substring(0, 10000) // Limit to 10k chars for API
     } catch (err) {
-      console.warn('[DocumentService] PDF extraction failed:', err);
-      return '';
+      console.warn('[DocumentService] PDF extraction failed:', err)
+      return ''
     }
   }
 

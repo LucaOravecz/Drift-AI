@@ -5,7 +5,7 @@ const {
   hasPermission,
   clientFindFirst,
   documentCreate,
-  auditLogCreate,
+  appendAuditEvent,
   extractPDFContent,
   inferDocumentType,
   extract,
@@ -14,7 +14,7 @@ const {
   hasPermission: vi.fn(),
   clientFindFirst: vi.fn(),
   documentCreate: vi.fn(),
-  auditLogCreate: vi.fn(),
+  appendAuditEvent: vi.fn(),
   extractPDFContent: vi.fn(),
   inferDocumentType: vi.fn(),
   extract: vi.fn(),
@@ -27,9 +27,8 @@ vi.mock("@/lib/middleware/api-auth", () => ({
 
 vi.mock("@/lib/db", () => ({
   default: {
-    client: { findFirst: clientFindFirst },
+    client: { findFirst: clientFindFirst, findUnique: clientFindFirst },
     document: { create: documentCreate },
-    auditLog: { create: auditLogCreate },
   },
 }));
 
@@ -41,17 +40,25 @@ vi.mock("@/lib/services/document.service", () => ({
   },
 }));
 
+vi.mock("@/lib/services/audit-event.service", () => ({
+  AuditEventService: {
+    appendEvent: appendAuditEvent,
+  },
+}));
+
 import { POST } from "@/app/api/documents/upload/route";
 
 describe("POST /api/documents/upload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    appendAuditEvent.mockResolvedValue({ id: "evt_1", eventHash: "hash" });
     hasPermission.mockReturnValue(true);
     authenticateApiRequest.mockResolvedValue({
       authenticated: true,
       context: {
         organizationId: "org_123",
         userId: "user_123",
+        role: "ADVISOR",
         authMethod: "SESSION",
       },
     });
@@ -67,8 +74,20 @@ describe("POST /api/documents/upload", () => {
       riskItems: ["Risk 1"],
     });
     documentCreate.mockResolvedValue({ id: "doc_123" });
-    auditLogCreate.mockResolvedValue(undefined);
     extractPDFContent.mockResolvedValue("Extracted text");
+  });
+
+  it("rejects uploads when RBAC denies documents_upload", async () => {
+    hasPermission.mockReturnValue(false);
+
+    const form = new FormData();
+    form.set("file", new File(["hello"], "plan.pdf", { type: "application/pdf" }));
+    form.set("clientId", "client_123");
+
+    const response = await POST({ formData: async () => form } as never);
+
+    expect(response.status).toBe(403);
+    expect(documentCreate).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated uploads", async () => {
@@ -131,13 +150,11 @@ describe("POST /api/documents/upload", () => {
         }),
       }),
     );
-    expect(auditLogCreate).toHaveBeenCalledWith(
+    expect(appendAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          organizationId: "org_123",
-          userId: "user_123",
-          action: "DOCUMENT_UPLOADED",
-        }),
+        organizationId: "org_123",
+        userId: "user_123",
+        action: "DOCUMENT_UPLOADED",
       }),
     );
     expect(body.document).toEqual({ id: "doc_123" });

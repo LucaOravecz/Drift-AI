@@ -15,7 +15,7 @@ export type Capability =
   | 'USER_MANAGE'
   | 'ONBOARDING_MANAGE'
 
-const ROLE_CAPABILITIES: Record<InstitutionalRole, Capability[]> = {
+export const ROLE_CAPABILITIES: Record<InstitutionalRole, Capability[]> = {
   ADMIN: [
     'CLIENT_VIEW', 'CLIENT_WRITE', 'FINANCIAL_PII_VIEW', 'AI_GENERATION', 
     'COMMUNICATION_SEND', 'COMMUNICATION_APPROVE', 'OPPORTUNITY_APPROVE_HIGH', 
@@ -47,6 +47,14 @@ export interface SecurityContext {
   userId: string
   organizationId: string
   role: InstitutionalRole
+}
+
+export function roleHasAllCapabilities(role: string, required: readonly Capability[]): boolean {
+  if (required.length === 0) return true;
+  const normalized = role as InstitutionalRole;
+  const granted = ROLE_CAPABILITIES[normalized];
+  if (!granted) return false;
+  return required.every((c) => granted.includes(c));
 }
 
 export class SecurityService {

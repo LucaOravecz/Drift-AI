@@ -3,7 +3,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { DocumentService } from "@/lib/services/document.service";
-import { authenticateApiRequest } from "@/lib/middleware/api-auth";
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth";
 import { AuditEventService } from "@/lib/services/audit-event.service";
 
 /**
@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 });
   }
 
+  if (!hasPermission(auth.context, "write", "documents_upload")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+  }
+
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
@@ -32,6 +36,19 @@ export async function POST(req: NextRequest) {
     }
     if (!clientId) {
       return NextResponse.json({ error: "clientId is required" }, { status: 400 });
+    }
+
+    const isPdf =
+      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const isPlainText =
+      file.type === "text/plain" ||
+      file.type === "text/markdown" ||
+      file.name.toLowerCase().endsWith(".txt");
+    if (!isPdf && !isPlainText) {
+      return NextResponse.json(
+        { error: "Unsupported file type. Upload PDF or plain text." },
+        { status: 415 },
+      );
     }
 
     // Validate client exists

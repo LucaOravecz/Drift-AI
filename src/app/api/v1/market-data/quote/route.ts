@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { authenticateApiRequest } from "@/lib/middleware/api-auth";
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth";
 import { MarketDataService } from "@/lib/services/market-data.service";
 
 /**
@@ -11,6 +11,10 @@ export async function GET(request: Request) {
   const auth = await authenticateApiRequest();
   if (!auth.authenticated || !auth.context) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 });
+  }
+
+  if (!hasPermission(auth.context, "read", "market_data")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);

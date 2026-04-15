@@ -1,10 +1,15 @@
+import "server-only";
+
 import prisma from '../db'
-import { callClaude } from './ai.service'
+import { callClaude, callClaudeStructured } from './ai.service'
 import { SecurityContext, SecurityService } from './security.service'
 import { ClientMemoryService } from './client-memory.service'
 import { detectClientOpportunities } from '../engines/opportunity.engine'
 import { AuditService } from './audit.service'
 import { IntegrationService } from './integration.service'
+import { AuditEventService } from './audit-event.service'
+import { ComplianceNLPService } from './compliance-nlp.service'
+import { OrgOperationalSettings } from '@/lib/org-operational-settings'
 
 export class CommunicationService {
   private static async resolveOrgId(ctx?: SecurityContext | null): Promise<string> {
@@ -259,6 +264,221 @@ Note: This draft was generated as a template because the communication generatio
     })
 
     return comm
+  }
+
+  static async generatePostMeetingFollowUpDraft(params: {
+    organizationId: string
+    userId: string
+    clientId: string
+    meetingId: string
+    meetingTitle: string
+    meetingDate: string
+    meetingNotes: string | null
+    commitments: Array<{
+      title: string
+      description: string
+      priority: string
+      sourceEvidence: string
+    }>
+  }) {
+    const client = await prisma.client.findFirst({
+      where: {
+        id: params.clientId,
+        organizationId: params.organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        riskProfile: true,
+      },
+    })
+
+    if (!client) {
+      throw new Error("Client not found or access denied.")
+    }
+
+    const advisor = await prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { name: true, email: true },
+    })
+
+    const firstName = client.name.split(" ")[0] ?? client.name
+    const advisorName = advisor?.name ?? advisor?.email ?? "Your Advisor"
+
+    const orgFlags = await OrgOperationalSettings.get(params.organizationId)
+
+    let emailSubject: string
+    let emailBody: string
+    const draftMeta: {
+      generationMethod: "AI_DRAFT" | "TEMPLATE_FALLBACK"
+      source: "POST_MEETING_WORKFLOW"
+      meetingId: string
+      commitments: typeof params.commitments
+    } = {
+      generationMethod: "AI_DRAFT",
+      source: "POST_MEETING_WORKFLOW",
+      meetingId: params.meetingId,
+      commitments: params.commitments,
+    }
+
+    if (!orgFlags.aiFeaturesEnabled) {
+      draftMeta.generationMethod = "TEMPLATE_FALLBACK"
+      emailSubject = `Follow-up: ${params.meetingTitle}`
+      emailBody = `Hi ${firstName},
+
+Thank you for the conversation. ${advisorName} will follow up with any written materials or action items.
+
+---
+Internal meeting notes:
+${params.meetingNotes ?? "(none on file)"}
+
+_(AI drafting is disabled for your firm. Edit this message before sending.)_`
+    } else {
+      const promptContext = {
+        meeting: {
+          id: params.meetingId,
+          title: params.meetingTitle,
+          date: params.meetingDate,
+          notes: params.meetingNotes ?? "",
+        },
+        client: {
+          name: client.name,
+          firstName,
+          riskProfile: client.riskProfile ?? "Not recorded",
+        },
+        commitments: params.commitments.map((commitment) => ({
+          title: commitment.title,
+          description: commitment.description,
+          priority: commitment.priority,
+          sourceEvidence: commitment.sourceEvidence,
+        })),
+        advisor: {
+          name: advisorName,
+        },
+      }
+
+      const emailDraft = await callClaudeStructured<{ subject: string; body: string }>(
+        `You draft post-meeting follow-up emails for a registered investment advisor.
+
+STRICT RULES:
+1. Use only the facts provided in the JSON context.
+2. Do not invent promises, portfolio results, deadlines, or recommendations.
+3. If commitments are missing, say the team will follow up with a written recap rather than guessing.
+4. Keep the tone professional and client-ready.
+5. Return JSON only matching the schema.`,
+        JSON.stringify(promptContext),
+        {
+          feature: "OUTREACH_DRAFT",
+          organizationId: params.organizationId,
+          userId: params.userId,
+          modelOverride: "claude-sonnet-4-20250514",
+          maxTokens: 1200,
+          schema: {
+            type: "object",
+            properties: {
+              subject: { type: "string" },
+              body: { type: "string" },
+            },
+            required: ["subject", "body"],
+          },
+        },
+      )
+      emailSubject = emailDraft.subject.trim()
+      emailBody = emailDraft.body.trim()
+    }
+
+    const communication = await prisma.communication.create({
+      data: {
+        clientId: params.clientId,
+        type: "EMAIL",
+        direction: "OUTBOUND",
+        subject: emailSubject,
+        body: emailBody,
+        status: "PENDING_APPROVAL",
+        approvalComments: JSON.stringify(draftMeta),
+      },
+    });
+
+    let compliancePreScreen:
+      | {
+          isClean: boolean;
+          riskScore: number;
+          requiresReview: boolean;
+          hitCount: number;
+        }
+      | undefined;
+    try {
+      const scan = await ComplianceNLPService.fullScan(
+        `${emailSubject}\n\n${emailBody}`,
+        params.organizationId,
+        communication.id,
+        "COMMUNICATION",
+        params.userId,
+        false,
+      );
+      compliancePreScreen = {
+        isClean: scan.isClean,
+        riskScore: scan.riskScore,
+        requiresReview: scan.requiresReview,
+        hitCount: scan.hits.length,
+      };
+    } catch (err) {
+      console.warn("[CommunicationService] post-meeting compliance pre-screen failed:", err);
+    }
+
+    if (compliancePreScreen) {
+      await prisma.communication.update({
+        where: { id: communication.id },
+        data: {
+          approvalComments: JSON.stringify({
+            ...draftMeta,
+            compliancePreScreen,
+          }),
+        },
+      });
+    }
+
+    await AuditEventService.appendEvent({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      action: "POST_MEETING_FOLLOWUP_DRAFT_CREATED",
+      target: "Communication",
+      targetId: communication.id,
+      details: `Post-meeting follow-up draft created for ${client.name}.`,
+      aiInvolved: draftMeta.generationMethod === "AI_DRAFT",
+      severity: "INFO",
+      metadata: {
+        meetingId: params.meetingId,
+        clientId: params.clientId,
+        commitmentCount: params.commitments.length,
+      },
+    })
+
+    await prisma.notification.create({
+      data: {
+        organizationId: params.organizationId,
+        userId: params.userId,
+        type: "COMMUNICATION",
+        title: "Follow-up draft pending approval",
+        body: `A post-meeting follow-up draft for ${client.name} is ready for review.`,
+        link: "/communications",
+      },
+    }).catch(() => null)
+
+    await prisma.complianceFlag.create({
+      data: {
+        organizationId: params.organizationId,
+        type: "UNREVIEWED_DRAFT",
+        severity: "LOW",
+        description: `Post-meeting follow-up draft for ${client.name} requires approval before sending.`,
+        target: `Communication:${communication.id}`,
+        targetId: communication.id,
+        aiInvolved: draftMeta.generationMethod === "AI_DRAFT",
+        status: "OPEN",
+      },
+    })
+
+    return communication
   }
 
   static async sendEmail(commId: string, ctx: SecurityContext): Promise<void> {

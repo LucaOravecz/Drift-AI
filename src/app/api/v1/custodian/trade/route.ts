@@ -26,20 +26,28 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await CustodianIntegrationService.submitTrade(
-    auth.context.organizationId,
-    body.custodian as CustodianProvider,
-    body.accountId,
-    body.ticker,
-    body.side,
-    body.quantity,
-    body.orderType ?? "MARKET",
-    body.limitPrice,
-  );
+  try {
+    const result = await CustodianIntegrationService.submitTrade(
+      auth.context.organizationId,
+      body.custodian as CustodianProvider,
+      body.accountId,
+      body.ticker,
+      body.side,
+      body.quantity,
+      body.orderType ?? "MARKET",
+      body.limitPrice,
+    );
 
-  if (!result) {
-    return NextResponse.json({ error: "Trade submission failed" }, { status: 500 });
+    if (!result) {
+      return NextResponse.json({ error: "Trade submission failed" }, { status: 500 });
+    }
+
+    return NextResponse.json({ data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("read-only")) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    throw err;
   }
-
-  return NextResponse.json({ data: result });
 }

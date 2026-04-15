@@ -3,7 +3,7 @@ import "server-only"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getActiveSession } from "@/lib/auth"
-import { authenticateApiRequest } from "@/lib/middleware/api-auth"
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth"
 import { BillingService, PLAN_LIMITS, type PlanTier } from "@/lib/services/billing.service"
 
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY ?? "")
@@ -18,6 +18,10 @@ export async function POST(request: Request) {
   const auth = await authenticateApiRequest()
   if (!auth.authenticated || !auth.context) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
+  }
+
+  if (!hasPermission(auth.context, "write", "stripe")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
   }
 
   try {

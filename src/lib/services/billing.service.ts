@@ -7,7 +7,7 @@ import { AuditEventService } from "./audit-event.service";
  * Billing & Subscription Service
  *
  * Manages Stripe-backed subscriptions, seat counting, and feature gating.
- * Stripe API calls are stubbed — connect your Stripe keys to activate.
+ * Webhook handlers in `/api/stripe/webhook` sync subscription state when Stripe keys are configured.
  */
 
 // ---------------------------------------------------------------------------
@@ -15,6 +15,11 @@ import { AuditEventService } from "./audit-event.service";
 // ---------------------------------------------------------------------------
 
 export type PlanTier = "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
+export type LaunchFeature =
+  | "POST_MEETING_WORKFLOW"
+  | "CUSTODIAN_SYNC"
+  | "CLIENT_PORTAL"
+  | "MARKET_DATA";
 
 export interface PlanLimits {
   maxSeats: number;
@@ -73,6 +78,46 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
 // ---------------------------------------------------------------------------
 
 export class BillingService {
+  static async checkFeatureAccess(
+    organizationId: string,
+    feature: LaunchFeature,
+  ): Promise<{ allowed: boolean; reason?: string; plan: PlanTier }> {
+    const subscription = await this.getSubscription(organizationId);
+    const plan = (subscription.plan as PlanTier) ?? "STARTER";
+
+    const allowed = (() => {
+      switch (feature) {
+        case "POST_MEETING_WORKFLOW":
+          return plan === "PROFESSIONAL" || plan === "ENTERPRISE";
+        case "CUSTODIAN_SYNC":
+          return plan === "PROFESSIONAL" || plan === "ENTERPRISE";
+        case "CLIENT_PORTAL":
+          return plan === "ENTERPRISE";
+        case "MARKET_DATA":
+          return plan === "ENTERPRISE";
+        default:
+          return false;
+      }
+    })();
+
+    if (allowed) {
+      return { allowed: true, plan };
+    }
+
+    const reasonMap: Record<LaunchFeature, string> = {
+      POST_MEETING_WORKFLOW: "Post-meeting workflow requires the Professional plan or above.",
+      CUSTODIAN_SYNC: "Custodian sync requires the Professional plan or above.",
+      CLIENT_PORTAL: "Client portal requires the Enterprise plan.",
+      MARKET_DATA: "Market data feeds require the Enterprise plan.",
+    };
+
+    return {
+      allowed: false,
+      reason: reasonMap[feature],
+      plan,
+    };
+  }
+
   /**
    * Get the subscription for an organization, creating a trial if none exists.
    */

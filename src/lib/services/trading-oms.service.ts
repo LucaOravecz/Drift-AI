@@ -1,6 +1,7 @@
 import "server-only";
 
 import prisma from "@/lib/db";
+import { OrgOperationalSettings } from "@/lib/org-operational-settings";
 import { AuditEventService } from "./audit-event.service";
 import { ComplianceNLPService } from "./compliance-nlp.service";
 
@@ -171,6 +172,8 @@ export class TradingOMSService {
     order: Omit<TradeOrder, "id" | "status" | "complianceStatus">,
     userId: string,
   ): Promise<TradeOrder> {
+    await OrgOperationalSettings.assertTradingWritesAllowed(order.organizationId);
+
     // Run pre-trade compliance
     const compliance = await this.preTradeCompliance(order);
 

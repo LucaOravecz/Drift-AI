@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -111,6 +111,12 @@ model OrganizationSettings {
   dataRetentionDays  Int          @default(2555) // 7 years default for SEC books-and-records
   encryptionAtRest   Boolean      @default(true)
   ipAllowlist        String?      // JSON array of CIDR ranges
+  /// When false, LLM calls are blocked firm-wide (deterministic compliance may still run).
+  aiFeaturesEnabled  Boolean      @default(true)
+  /// Read-only / paper mode: block custodian trades and OMS submissions; sync and viewing still allowed.
+  readOnlyMode       Boolean      @default(false)
+  /// Alert when |internal book − custodian-reported| / AUM exceeds this many basis points (e.g. 50 = 0.5%).
+  syncDriftAlertBps  Int          @default(50)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 

@@ -1,6 +1,6 @@
 import "server-only"
 import { NextResponse } from "next/server"
-import { authenticateApiRequest } from "@/lib/middleware/api-auth"
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth"
 import { z } from "zod"
 
 const bodySchema = z.object({
@@ -15,8 +15,12 @@ const bodySchema = z.object({
  */
 export async function POST(req: Request) {
   const auth = await authenticateApiRequest()
-  if (!auth.authenticated) {
+  if (!auth.authenticated || !auth.context) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
+  }
+
+  if (!hasPermission(auth.context, "write", "custodian_integrations")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
   }
 
   try {
@@ -28,7 +32,7 @@ export async function POST(req: Request) {
     }
 
     const { provider } = parsed.data
-    const organizationId = auth.context!.organizationId
+    const organizationId = auth.context.organizationId
 
     const state = crypto.getRandomValues(new Uint8Array(32))
     const stateStr = Buffer.from(state).toString("hex")

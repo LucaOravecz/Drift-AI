@@ -1,12 +1,16 @@
 import "server-only"
 
 import prisma from '@/lib/db'
-import { authenticateApiRequest } from '@/lib/middleware/api-auth'
+import { authenticateApiRequest, hasPermission } from '@/lib/middleware/api-auth'
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   const auth = await authenticateApiRequest()
   if (!auth.authenticated || !auth.context) {
     return new Response(JSON.stringify({ error: auth.error }), { status: auth.statusCode ?? 401 })
+  }
+
+  if (!hasPermission(auth.context, 'read', 'intelligence')) {
+    return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403 })
   }
 
   try {

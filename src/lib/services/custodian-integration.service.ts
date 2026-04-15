@@ -1,6 +1,7 @@
 import "server-only";
 
 import prisma from "@/lib/db";
+import { OrgOperationalSettings } from "@/lib/org-operational-settings";
 import { AuditEventService } from "./audit-event.service";
 
 /**
@@ -917,6 +918,8 @@ export class CustodianIntegrationService {
     orderType: "MARKET" | "LIMIT" = "MARKET",
     limitPrice?: number,
   ): Promise<{ orderId: string; status: string } | null> {
+    await OrgOperationalSettings.assertTradingWritesAllowed(organizationId);
+
     switch (custodian) {
       case "SCHWAB":
       case "TD_AMERITRADE":

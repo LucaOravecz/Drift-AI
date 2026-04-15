@@ -12,6 +12,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/org-operational-settings", () => ({
+  OrgOperationalSettings: {
+    assertAiEnabled: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 import { callClaude, callClaudeJSON } from "@/lib/services/ai.service";
 
 describe("ai service", () => {
@@ -35,7 +41,7 @@ describe("ai service", () => {
 
     await expect(
       callClaude("system", "user", { organizationId: "org_123" }),
-    ).rejects.toThrow("OpenRouter API key is not configured.");
+    ).rejects.toThrow("OPENROUTER_API_KEY is not configured");
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(aiUsageCreate).toHaveBeenCalledWith(
@@ -43,7 +49,7 @@ describe("ai service", () => {
         data: expect.objectContaining({
           organizationId: "org_123",
           success: false,
-          errorMessage: "OpenRouter API key is not configured.",
+          errorMessage: "OPENROUTER_API_KEY is not configured",
         }),
       }),
     );

@@ -1,6 +1,6 @@
 import "server-only"
 import { NextResponse } from "next/server"
-import { authenticateApiRequest } from "@/lib/middleware/api-auth"
+import { authenticateApiRequest, hasPermission } from "@/lib/middleware/api-auth"
 import { z } from "zod"
 import prisma from "@/lib/db"
 import { AuditService } from "@/lib/services/audit.service"
@@ -56,8 +56,12 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   const auth = await authenticateApiRequest()
-  if (!auth.authenticated) {
+  if (!auth.authenticated || !auth.context) {
     return NextResponse.json({ error: auth.error }, { status: auth.statusCode ?? 401 })
+  }
+
+  if (!hasPermission(auth.context, "write", "custodian_integrations")) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
   }
 
   try {

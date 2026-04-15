@@ -26,6 +26,11 @@ test.describe("public auth", () => {
     await expect(page.getByLabel("Password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   });
+
+  test("subprocessors disclosure page renders", async ({ page }) => {
+    await gotoStable(page, "/subprocessors");
+    await expect(page.getByRole("heading", { name: "Subprocessors" })).toBeVisible();
+  });
 });
 
 test.describe("authenticated client demo smoke", () => {
