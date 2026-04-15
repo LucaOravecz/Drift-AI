@@ -72,6 +72,8 @@ interface DashboardProps {
   alerts: Alert[];
   revenueEngine: RevenueOpportunity[];
   chartData?: ChartItem[];
+  /** Set when the dashboard could not reach Postgres — shows setup guidance */
+  offlineNotice?: string | null;
 }
 
 function MetricCard({ label, value, sub, icon: Icon, accent = "emerald", delay = "0s" }: {
@@ -104,7 +106,7 @@ function MetricCard({ label, value, sub, icon: Icon, accent = "emerald", delay =
   );
 }
 
-export function DashboardClient({ metrics, alerts, revenueEngine, chartData }: DashboardProps) {
+export function DashboardClient({ metrics, alerts, revenueEngine, chartData, offlineNotice }: DashboardProps) {
   const [isPending, startTransition] = useTransition();
 
   return (
@@ -114,11 +116,29 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData }: D
       animate="show"
       className="mx-auto flex max-w-[1600px] flex-col gap-10 pb-16 text-[color:var(--foreground)]"
     >
+      {offlineNotice ? (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90"
+        >
+          <span className="font-medium text-amber-200">Database offline.</span> {offlineNotice}
+        </div>
+      ) : null}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <span className="rounded-full border px-3 py-1 text-xs font-medium" style={{ background: "rgba(29,158,117,0.12)", color: "#5DCAA5", borderColor: "rgba(29,158,117,0.24)" }}>Live</span>
+            <span
+              className="rounded-full border px-3 py-1 text-xs font-medium"
+              style={
+                offlineNotice
+                  ? { background: "rgba(239,159,39,0.12)", color: "#EF9F27", borderColor: "rgba(239,159,39,0.28)" }
+                  : { background: "rgba(29,158,117,0.12)", color: "#5DCAA5", borderColor: "rgba(29,158,117,0.24)" }
+              }
+            >
+              {offlineNotice ? "Demo / offline" : "Live"}
+            </span>
           </div>
           <h1 className="text-4xl font-light leading-none tracking-[-0.05em] md:text-5xl">Executive Summary</h1>
           <p className="mt-2 max-w-2xl text-sm text-[color:var(--muted-foreground)]">Portfolio intelligence and revenue signals across your book of business.</p>
