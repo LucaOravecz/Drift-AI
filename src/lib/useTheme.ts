@@ -14,13 +14,15 @@ export function useTheme({ storageKey = "theme-preference" }: UseThemeOptions = 
   const [theme, setTheme] = useState<Theme>("system");
   const [mounted, setMounted] = useState(false);
 
-  // Initialize theme from localStorage
+  // Initialize theme from localStorage after mount (avoid SSR/hydration mismatch).
   useEffect(() => {
     const stored = localStorage.getItem(storageKey) as Theme | null;
-    if (stored && ["light", "dark", "system"].includes(stored)) {
-      setTheme(stored);
-    }
-    setMounted(true);
+    queueMicrotask(() => {
+      if (stored && ["light", "dark", "system"].includes(stored)) {
+        setTheme(stored);
+      }
+      setMounted(true);
+    });
   }, [storageKey]);
 
   // Apply theme to document

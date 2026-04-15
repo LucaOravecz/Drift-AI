@@ -83,13 +83,13 @@ function ReasoningReplay({ log }: { log: AuditLog }) {
             <div className="mt-2 rounded-lg border border-white/5 bg-black/40 p-3 space-y-2 font-mono text-xs text-zinc-400">
               {metadata && (
                 <div>
-                  <p className="text-zinc-500 mb-1">// Trace Metadata</p>
+                  <p className="text-zinc-500 mb-1">{"// Trace Metadata"}</p>
                   <pre className="whitespace-pre-wrap text-zinc-300">{JSON.stringify(metadata, null, 2)}</pre>
                 </div>
               )}
               {afterState && (
                 <div>
-                  <p className="text-zinc-500 mb-1">// State After Action</p>
+                  <p className="text-zinc-500 mb-1">{"// State After Action"}</p>
                   <pre className="whitespace-pre-wrap text-zinc-300">{JSON.stringify(afterState, null, 2)}</pre>
                 </div>
               )}

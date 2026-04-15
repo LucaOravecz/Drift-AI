@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHmac } from "node:crypto";
+
 import prisma from "@/lib/db";
 import { AuditEventService } from "./audit-event.service";
 import { SSENotificationService } from "./sse-notification.service";
@@ -271,7 +273,6 @@ export class BackgroundJobService {
    * Sign a webhook payload with HMAC-SHA256.
    */
   private static signPayload(payload: string, secret: string): string {
-    const { createHmac } = require("crypto");
     return createHmac("sha256", secret).update(payload).digest("hex");
   }
 

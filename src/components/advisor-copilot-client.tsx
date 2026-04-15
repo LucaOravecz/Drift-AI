@@ -24,6 +24,10 @@ interface Message {
   loading?: boolean
 }
 
+function newCopilotMessageId(prefix: "u" | "a"): string {
+  return `${prefix}-${crypto.randomUUID()}`
+}
+
 // ── Section renderer ──────────────────────────────────────────────────────────
 
 function SectionIcon({ type }: { type: CopilotResponseSection["type"] }) {
@@ -286,12 +290,12 @@ export function AdvisorCopilotClient() {
     if (!prompt.trim() || isPending) return
 
     const userMsg: Message = {
-      id: `u-${Date.now()}`,
+      id: newCopilotMessageId("u"),
       role: "user",
       content: prompt.trim(),
     }
     const loadingMsg: Message = {
-      id: `a-${Date.now()}`,
+      id: newCopilotMessageId("a"),
       role: "assistant",
       content: prompt.trim(),
       loading: true,

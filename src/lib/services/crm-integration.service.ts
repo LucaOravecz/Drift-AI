@@ -103,7 +103,7 @@ class RedtailCRMConnector {
     let contactsUpdated = 0;
     let contactsSkipped = 0;
     let activitiesImported = 0;
-    let householdsCreated = 0;
+    const householdsCreated = 0;
 
     try {
       // Paginate through all contacts
@@ -420,7 +420,7 @@ class SalesforceFSCConnector {
     let contactsUpdated = 0;
     let contactsSkipped = 0;
     let activitiesImported = 0;
-    let householdsCreated = 0;
+    const householdsCreated = 0;
 
     try {
       // SOQL query for Account (client) records

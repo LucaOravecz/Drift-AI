@@ -280,7 +280,7 @@ export function DocumentsClient({ documents, stats, clients }: { documents: any[
                   <div className="flex flex-col items-center justify-center h-48 gap-4 text-center">
                     <FileText className="h-8 w-8 text-zinc-700" />
                     <div className="text-zinc-500">Document not yet processed.</div>
-                    <div className="text-zinc-600 text-sm">Click "Process Document" to run AI analysis.</div>
+                    <div className="text-zinc-600 text-sm">{"Click \"Process Document\" to run AI analysis."}</div>
                   </div>
                 )}
               </CardContent>
