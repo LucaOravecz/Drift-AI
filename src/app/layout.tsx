@@ -43,22 +43,11 @@ export default function RootLayout({
       style={{ colorScheme: "light" }}
     >
       <body className="min-h-full flex flex-col bg-[var(--background)] selection:bg-brand-500/30">
+        {/* External file avoids React 19 warning about inline script nodes in the component tree */}
         <Script
           id="drift-theme-script"
+          src="/drift-theme.js"
           strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-(function() {
-  try {
-    var stored = localStorage.getItem('drift-theme');
-    var isDark = stored ? stored === 'dark' : false;
-    document.documentElement.classList.toggle('light', !isDark);
-    document.documentElement.classList.toggle('dark', isDark);
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-  } catch (e) {}
-})()
-            `.trim(),
-          }}
         />
         {children}
         <Toaster position="top-right" theme="light" closeButton richColors />

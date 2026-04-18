@@ -14,8 +14,11 @@ export function ThemeToggle() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    setIsDark(resolveDarkFromDom());
+    const dark = resolveDarkFromDom();
+    queueMicrotask(() => {
+      setMounted(true);
+      setIsDark(dark);
+    });
   }, []);
 
   useEffect(() => {
