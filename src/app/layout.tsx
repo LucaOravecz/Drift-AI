@@ -42,20 +42,24 @@ export default function RootLayout({
       className={`h-full antialiased light ${GeistSans.variable} ${GeistMono.variable} ${dmSans.variable} ${dmMono.variable} ${instrumentSerif.variable}`}
       style={{ colorScheme: "light" }}
     >
-      <head>
-        <Script id="drift-theme-script" strategy="beforeInteractive">
-          {`
-            (function() {
-              var stored = localStorage.getItem('drift-theme');
-              var isDark = stored ? stored === 'dark' : false;
-              document.documentElement.classList.toggle('light', !isDark);
-              document.documentElement.classList.toggle('dark', isDark);
-              document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-            })()
-          `}
-        </Script>
-      </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] selection:bg-brand-500/30">
+        <Script
+          id="drift-theme-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  try {
+    var stored = localStorage.getItem('drift-theme');
+    var isDark = stored ? stored === 'dark' : false;
+    document.documentElement.classList.toggle('light', !isDark);
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+  } catch (e) {}
+})()
+            `.trim(),
+          }}
+        />
         {children}
         <Toaster position="top-right" theme="light" closeButton richColors />
       </body>
