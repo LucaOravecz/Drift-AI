@@ -40,6 +40,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { ComponentType } from "react";
 import type { BrandingSnapshot } from "@/lib/brand-config";
 import { signOutAction } from "@/lib/product-actions";
 
@@ -79,6 +80,38 @@ const navItemClass = cn(
   "data-[active=true]:bg-[color:var(--sidebar-active-bg)] data-[active=true]:border-[color:var(--sidebar-active-border)] data-[active=true]:text-[color:var(--sidebar-active-fg)]"
 );
 
+function NavItem({
+  item,
+  isActive,
+}: {
+  item: { title: string; url: string; icon: ComponentType<{ className?: string; strokeWidth?: number }> };
+  isActive: boolean;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={isActive}
+        tooltip={item.title}
+        className={navItemClass}
+        render={
+          <Link href={item.url} className="flex items-center gap-2.5">
+            <item.icon
+              className={cn(
+                "h-[15px] w-[15px] shrink-0",
+                isActive
+                  ? "text-[color:var(--sidebar-active-fg)]"
+                  : "text-[color:var(--sidebar-foreground)] opacity-60"
+              )}
+              strokeWidth={1.5}
+            />
+            <span>{item.title}</span>
+          </Link>
+        }
+      />
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar({
   branding,
   canManageUsers = false,
@@ -97,34 +130,8 @@ export function AppSidebar({
   const linkIsActive = (url: string) =>
     pathname === url || (url !== "/" && pathname.startsWith(url));
 
-  function NavItem({ item }: { item: { title: string; url: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> } }) {
-    const isActive = linkIsActive(item.url);
-    return (
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          isActive={isActive}
-          tooltip={item.title}
-          className={navItemClass}
-          render={
-            <Link href={item.url} className="flex items-center gap-2.5">
-              <item.icon
-                className={cn(
-                  "h-[15px] w-[15px] shrink-0",
-                  isActive
-                    ? "text-[color:var(--sidebar-active-fg)]"
-                    : "text-[color:var(--sidebar-foreground)] opacity-60"
-                )}
-                strokeWidth={1.5}
-              />
-              <span>{item.title}</span>
-            </Link>
-          }
-        />
-      </SidebarMenuItem>
-    );
-  }
-
   return (
+    // CSS custom property — no Tailwind utility supports arbitrary var injection on the Sidebar root
     <Sidebar
       variant="sidebar"
       collapsible="icon"
@@ -181,11 +188,12 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               {primaryNav.map((item) => (
-                <NavItem key={item.title} item={item} />
+                <NavItem key={item.url} item={item} isActive={linkIsActive(item.url)} />
               ))}
               {canManageUsers && (
                 <NavItem
                   item={{ title: "Admin Users", url: "/admin/users", icon: UserCog }}
+                  isActive={linkIsActive("/admin/users")}
                 />
               )}
             </SidebarMenu>
@@ -211,7 +219,7 @@ export function AppSidebar({
             <SidebarGroupContent>
               <SidebarMenu>
                 {practiceNav.map((item) => (
-                  <NavItem key={item.title} item={item} />
+                  <NavItem key={item.url} item={item} isActive={linkIsActive(item.url)} />
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
