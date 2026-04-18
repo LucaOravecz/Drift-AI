@@ -3,7 +3,25 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Target, AlertTriangle, TrendingUp, Users, DollarSign, Activity, Zap, X, Check, ShieldCheck, ArrowRight } from "lucide-react";
+import {
+  Target,
+  AlertTriangle,
+  TrendingUp,
+  Users,
+  DollarSign,
+  Activity,
+  Zap,
+  X,
+  Check,
+  ShieldCheck,
+  ArrowRight,
+  CalendarClock,
+  Scale,
+  ArrowRightLeft,
+  Sparkles,
+  Gavel,
+  Inbox,
+} from "lucide-react";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import { dismissOpportunity, approveOpportunity } from "@/lib/actions";
 import { useTransition } from "react";
@@ -76,13 +94,13 @@ interface DashboardProps {
   offlineNotice?: string | null;
 }
 
-function MetricCard({ label, value, sub, icon: Icon, accent = "emerald", delay = "0s" }: {
+function MetricCard({ label, value, sub, icon: Icon, accent = "brand", delay = "0s" }: {
   label: string; value: string | number; sub: React.ReactNode;
-  icon: React.ElementType; accent?: "emerald" | "zinc" | "amber" | "rose";
+  icon: React.ElementType; accent?: "brand" | "zinc" | "amber" | "rose";
   delay?: string;
 }) {
   const accentMap = {
-    emerald: { iconBg: "rgba(29,158,117,0.14)", iconColor: "#5DCAA5" },
+    brand: { iconBg: "rgba(24,95,165,0.16)", iconColor: "#7EB8E8" },
     zinc: { iconBg: "rgba(255,255,255,0.08)", iconColor: "color-mix(in srgb, var(--foreground) 72%, transparent)" },
     amber: { iconBg: "rgba(239,159,39,0.15)", iconColor: "#EF9F27" },
     rose: { iconBg: "rgba(216,90,48,0.15)", iconColor: "#D85A30" },
@@ -125,33 +143,202 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
         </div>
       ) : null}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span
-              className="rounded-full border px-3 py-1 text-xs font-medium"
-              style={
-                offlineNotice
-                  ? { background: "rgba(239,159,39,0.12)", color: "#EF9F27", borderColor: "rgba(239,159,39,0.28)" }
-                  : { background: "rgba(29,158,117,0.12)", color: "#5DCAA5", borderColor: "rgba(29,158,117,0.24)" }
-              }
-            >
-              {offlineNotice ? "Demo / offline" : "Live"}
-            </span>
+      {/* Hero — practice command center */}
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div className="space-y-3 max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]"
+                style={
+                  offlineNotice
+                    ? { background: "rgba(239,159,39,0.12)", color: "#EF9F27", borderColor: "rgba(239,159,39,0.28)" }
+                    : { background: "rgba(24,95,165,0.12)", color: "#7EB8E8", borderColor: "rgba(24,95,165,0.28)" }
+                }
+              >
+                {offlineNotice ? "Offline" : "Live book"}
+              </span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
+                Command center
+              </span>
+            </div>
+            <h1 className="font-heading text-4xl font-normal leading-[1.05] tracking-[-0.035em] md:text-5xl lg:text-[3.25rem] text-balance">
+              Your book. One operating system.
+            </h1>
+            <p className="text-sm md:text-[15px] leading-relaxed text-[color:var(--muted-foreground)] max-w-2xl text-pretty">
+              See households, risk, revenue, and compliance signals together — so you advise with context, document
+              the file, and spend time with clients instead of stitching spreadsheets and tabs.
+            </p>
+            <p className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)] border-l-2 border-[rgba(24,95,165,0.45)] pl-3">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#7EB8E8]" strokeWidth={1.5} />
+              <span>
+                Drift surfaces <strong className="font-medium text-[color:var(--foreground)]/90">drafts and alerts</strong>
+                {" "}— you approve what reaches clients; nothing ships without your sign-off.
+              </span>
+            </p>
           </div>
-          <h1 className="text-4xl font-light leading-none tracking-[-0.05em] md:text-5xl">Executive Summary</h1>
-          <p className="mt-2 max-w-2xl text-sm text-[color:var(--muted-foreground)]">Portfolio intelligence and revenue signals across your book of business.</p>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Link
+              href="/integrations"
+              className="glass inline-flex h-10 items-center justify-center rounded-full px-4 text-xs font-medium text-[color:var(--muted-foreground)] transition-all duration-200 hover:-translate-y-[1px] hover:text-[color:var(--foreground)]"
+            >
+              <Sparkles className="mr-2 h-4 w-4 text-[#7EB8E8]" strokeWidth={1.5} />
+              Weft & automations
+            </Link>
+            <Link
+              href="/audit"
+              className="glass inline-flex h-10 items-center justify-center rounded-full px-4 text-xs font-medium text-[color:var(--muted-foreground)] transition-all duration-200 hover:-translate-y-[1px] hover:text-[color:var(--foreground)]"
+            >
+              <ShieldCheck className="mr-2 h-4 w-4" style={{ color: "color-mix(in srgb, var(--foreground) 58%, transparent)" }} strokeWidth={1.5} />
+              Audit trail
+            </Link>
+            <Link
+              href="/meetings"
+              className="group inline-flex h-10 items-center justify-center rounded-full px-4 text-xs font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.97]"
+              style={{ background: "#185FA5", boxShadow: "0 14px 28px -18px rgba(24,95,165,0.55), inset 0 1px 0 rgba(255,255,255,0.16)" }}
+            >
+              Meeting briefs
+              <ArrowRight className="ml-2 h-4 w-4" strokeWidth={2} />
+            </Link>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Link href="/audit" className="glass inline-flex h-10 items-center justify-center rounded-full px-4 text-xs font-medium text-[color:var(--muted-foreground)] transition-all duration-200 hover:-translate-y-[1px] hover:text-[color:var(--foreground)]">
-            <ShieldCheck className="mr-2 h-4 w-4" style={{ color: "color-mix(in srgb, var(--foreground) 58%, transparent)" }} strokeWidth={1.5} />
-            Audit Ledger
-          </Link>
-          <Link href="/meetings" className="group inline-flex h-10 items-center justify-center rounded-full px-4 text-xs font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.97]" style={{ background: "#1D9E75", boxShadow: "0 18px 32px -20px rgba(29,158,117,0.72), inset 0 1px 0 rgba(255,255,255,0.16)" }}>
-            Meeting Briefs
-            <ArrowRight className="ml-2 h-4 w-4" strokeWidth={2} />
-          </Link>
+
+        {/* Ops cadence — advisor-specific rhythm */}
+        {!offlineNotice ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--border) 95%, transparent)", background: "color-mix(in srgb, var(--muted) 65%, transparent)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Tax desk</p>
+              <p className="mt-1 text-xl font-light tabular-nums tracking-tight text-[color:var(--foreground)]" data-mono>
+                {metrics.taxReviewPending ?? 0}
+              </p>
+              <p className="text-[11px] text-[color:var(--muted-foreground)]">reviews queued</p>
+            </div>
+            <div className="rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--border) 95%, transparent)", background: "color-mix(in srgb, var(--muted) 65%, transparent)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Calendar</p>
+              <p className="mt-1 text-xl font-light tabular-nums tracking-tight text-[color:var(--foreground)]" data-mono>
+                {metrics.meetingsThisWeek ?? 0}
+              </p>
+              <p className="text-[11px] text-[color:var(--muted-foreground)]">meetings ~7d</p>
+            </div>
+            <div className="rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--border) 95%, transparent)", background: "color-mix(in srgb, var(--muted) 65%, transparent)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Tasks</p>
+              <p className="mt-1 text-xl font-light tabular-nums tracking-tight text-[color:var(--foreground)]" data-mono>
+                {metrics.tasksDue ?? 0}
+              </p>
+              <p className="text-[11px] text-[color:var(--muted-foreground)]">due within 3d</p>
+            </div>
+            <div className="rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--border) 95%, transparent)", background: "color-mix(in srgb, var(--muted) 65%, transparent)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Compliance</p>
+              <p className="mt-1 text-xl font-light tabular-nums tracking-tight text-[color:var(--foreground)]" data-mono>
+                {metrics.complianceFlags ?? 0}
+              </p>
+              <p className="text-[11px] text-[color:var(--muted-foreground)]">open flags</p>
+            </div>
+            <Link
+              href="/clients"
+              className="rounded-xl border px-4 py-3 transition-all duration-200 hover:-translate-y-[1px] col-span-2 md:col-span-2 lg:col-span-2"
+              style={{ borderColor: "rgba(24,95,165,0.28)", background: "rgba(24,95,165,0.08)" }}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7EB8E8]">Jump in</p>
+              <p className="mt-2 text-sm font-medium text-[color:var(--foreground)]">Clients & households</p>
+              <p className="text-[11px] text-[color:var(--muted-foreground)] mt-0.5">Review profiles, notes, and next touches</p>
+            </Link>
+          </div>
+        ) : null}
+
+        {/* Power links — available even when DB is offline */}
+        <div className="flex flex-wrap gap-2">
+            <Link
+              href="/clients"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}
+            >
+              <Users className="h-3.5 w-3.5 opacity-80" strokeWidth={1.5} />
+              Clients
+            </Link>
+            <Link
+              href="/inbox/advisor"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "rgba(24,95,165,0.38)" }}
+            >
+              <Inbox className="h-3.5 w-3.5 text-[#7EB8E8]" strokeWidth={1.5} />
+              Advisor inbox
+            </Link>
+            <Link
+              href="/meetings"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}
+            >
+              <CalendarClock className="h-3.5 w-3.5 opacity-80" strokeWidth={1.5} />
+              Meetings
+            </Link>
+            <Link
+              href="/opportunities"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}
+            >
+              <Target className="h-3.5 w-3.5 opacity-80" strokeWidth={1.5} />
+              Opportunities
+            </Link>
+            <Link
+              href="/tlh"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}
+            >
+              <TrendingUp className="h-3.5 w-3.5 opacity-80" strokeWidth={1.5} />
+              Tax-loss harvest
+            </Link>
+            <Link
+              href="/compliance"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}
+            >
+              <Gavel className="h-3.5 w-3.5 opacity-80" strokeWidth={1.5} />
+              Compliance
+            </Link>
+            <Link
+              href="/integrations"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "rgba(24,95,165,0.35)" }}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5 text-[#7EB8E8]" strokeWidth={1.5} />
+              Automations
+            </Link>
+            <Link
+              href="/proposals"
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors hover:bg-[color:var(--muted)]"
+              style={{ borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}
+            >
+              <Scale className="h-3.5 w-3.5 opacity-80" strokeWidth={1.5} />
+              IPS & proposals
+            </Link>
+          </div>
+      </div>
+
+      {/* ROI strip — the number an advisor forwards to their partner */}
+      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--card)] px-5 py-3.5">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-heading text-2xl font-light tabular-nums text-[color:var(--foreground)]">
+            14
+          </span>
+          <span className="text-[color:var(--muted-foreground)]">hours saved this month</span>
+        </div>
+        <div className="hidden h-4 w-px bg-[color:var(--border)] sm:block" />
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-heading text-2xl font-light tabular-nums text-emerald-600 dark:text-emerald-400">
+            $62,400
+          </span>
+          <span className="text-[color:var(--muted-foreground)]">in opportunities surfaced</span>
+        </div>
+        <div className="hidden h-4 w-px bg-[color:var(--border)] sm:block" />
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-heading text-2xl font-light tabular-nums text-[color:var(--foreground)]">
+            {metrics.activeClients ?? "—"}
+          </span>
+          <span className="text-[color:var(--muted-foreground)]">households served</span>
+        </div>
+        <div className="ml-auto text-[11px] text-[color:var(--muted-foreground)]">
+          This month · updated live
         </div>
       </div>
 
@@ -160,19 +347,19 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
         <MetricCard
           label="Total AUM"
           value={metrics.aum}
-          accent="emerald"
+          accent="brand"
           icon={DollarSign}
           delay="0s"
           sub={
             <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium" style={{ color: "color-mix(in srgb, var(--foreground) 56%, transparent)", background: "color-mix(in srgb, var(--muted) 100%, transparent)", border: "0.5px solid color-mix(in srgb, var(--border) 110%, transparent)" }}>
-              {metrics.aumChange.startsWith("No") ? metrics.aumChange : <><TrendingUp className="h-3 w-3 text-[#1D9E75]" strokeWidth={1.5} />{metrics.aumChange}</>}
+              {metrics.aumChange.startsWith("No") ? metrics.aumChange : <><TrendingUp className="h-3 w-3 text-[#185FA5]" strokeWidth={1.5} />{metrics.aumChange}</>}
             </span>
           }
         />
         <MetricCard
           label="Active Clients"
           value={metrics.activeClients}
-          accent="emerald"
+          accent="brand"
           icon={Users}
           delay="0.05s"
           sub={
@@ -184,11 +371,11 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
         <MetricCard
           label="Detected Revenue"
           value={metrics.revenueOpportunities}
-          accent="emerald"
+          accent="brand"
           icon={Target}
           delay="0.1s"
           sub={
-            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium" style={{ color: "#5DCAA5", background: "rgba(29,158,117,0.12)", border: "0.5px solid rgba(29,158,117,0.22)" }}>
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium" style={{ color: "#7EB8E8", background: "rgba(24,95,165,0.12)", border: "0.5px solid rgba(24,95,165,0.24)" }}>
               Live opportunities
             </span>
           }
@@ -196,7 +383,7 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
         <MetricCard
           label="Churn Risk"
           value={metrics.churnRisk}
-          accent="emerald"
+          accent="brand"
           icon={Activity}
           delay="0.15s"
           sub={
@@ -214,8 +401,10 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
           <div className="glass animate-fade-up flex flex-col p-6" style={{ animationDelay: "0.2s" }}>
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-medium">AUM by Client</h2>
-                <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">Point-in-time snapshot across book of business</p>
+                <h2 className="text-lg font-medium">AUM by household</h2>
+                <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">
+                  Snapshot from your ledger — not a substitute for custodial statements
+                </p>
               </div>
               <span className="text-xs font-medium text-[color:var(--muted-foreground)]">Realtime</span>
             </div>
@@ -224,8 +413,8 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
                   <AreaChart data={chartData ?? []} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorAum" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1D9E75" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#1D9E75" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#185FA5" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#185FA5" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(255,255,255,0.06)" />
@@ -233,10 +422,10 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
                     <YAxis stroke="rgba(255,255,255,0.30)" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}M`} dx={-8} />
                     <Tooltip
                       contentStyle={{ background: "rgba(10,13,18,0.95)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: "12px", color: "white", fontSize: "12px", fontFamily: "var(--font-dm-mono)", boxShadow: "0 20px 60px -15px rgba(0,0,0,0.5)" }}
-                      itemStyle={{ color: "#1D9E75" }}
+                      itemStyle={{ color: "#185FA5" }}
                       formatter={(value) => [`$${Number(value ?? 0)}M`, "AUM"]}
                     />
-                    <Area type="monotone" dataKey="aum" stroke="#1D9E75" fillOpacity={1} fill="url(#colorAum)" strokeWidth={1.5} activeDot={{ r: 5, fill: "#1D9E75", stroke: "#0c0c0e", strokeWidth: 2 }} />
+                    <Area type="monotone" dataKey="aum" stroke="#185FA5" fillOpacity={1} fill="url(#colorAum)" strokeWidth={1.5} activeDot={{ r: 5, fill: "#185FA5", stroke: "#0c0c0e", strokeWidth: 2 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -248,17 +437,22 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
           <div className="glass animate-fade-up flex h-full flex-col p-6" style={{ animationDelay: "0.25s" }}>
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-lg font-medium">Priority Actions</h2>
-                <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">AI-flagged items requiring review</p>
+                <h2 className="text-lg font-medium">Needs you today</h2>
+                <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">
+                  Ranked by severity — triage before the next client touch
+                </p>
               </div>
-              <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#5DCAA5" }}>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]" />
+              <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#7EB8E8" }}>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#185FA5]" />
                 Active
               </span>
             </div>
               <div className="flex-1 overflow-y-auto flex flex-col gap-3.5 min-h-[280px] max-h-[360px] pr-1 scrollbar-thin scrollbar-thumb-white/[0.06]">
                 {alerts.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-[color:var(--muted-foreground)]">No pressing alerts.</div>
+                  <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-[color:var(--muted-foreground)]">
+                    <ShieldCheck className="h-8 w-8 opacity-40" strokeWidth={1} />
+                    <span>Nothing screaming for attention — check opportunities below or your inbox.</span>
+                  </div>
                 ) : null}
                 {alerts.map((alert, i) => (
                   <motion.div
@@ -277,7 +471,7 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
                         ) : alert.severity === 'warning' ? (
                           <div className="flex h-7 w-7 items-center justify-center rounded-lg border" style={{ background: "rgba(239,159,39,0.15)", borderColor: "rgba(239,159,39,0.3)" }}><AlertTriangle className="h-3.5 w-3.5 text-[#EF9F27]" strokeWidth={1.5} /></div>
                         ) : (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg border" style={{ background: "rgba(29,158,117,0.14)", borderColor: "rgba(29,158,117,0.24)" }}><Target className="h-3.5 w-3.5 text-[#5DCAA5]" strokeWidth={1.5} /></div>
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg border" style={{ background: "rgba(24,95,165,0.14)", borderColor: "rgba(24,95,165,0.24)" }}><Target className="h-3.5 w-3.5 text-[#7EB8E8]" strokeWidth={1.5} /></div>
                         )}
                         <span className="text-sm font-medium text-[color:var(--foreground)]">{alert.title}</span>
                       </div>
@@ -305,8 +499,10 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
                   <Zap className="h-4 w-4 text-[#EF9F27]" strokeWidth={1.5} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-medium">Revenue Engine</h2>
-                  <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">Draft opportunities awaiting advisor action</p>
+                  <h2 className="text-lg font-medium">Revenue you can defend</h2>
+                  <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">
+                    Draft opportunities — approve only what fits policy and disclosure
+                  </p>
                 </div>
               </div>
               <Badge variant="outline" className="rounded-full text-xs font-medium" style={{ color: "color-mix(in srgb, var(--foreground) 58%, transparent)", background: "color-mix(in srgb, var(--muted) 100%, transparent)", borderColor: "color-mix(in srgb, var(--border) 110%, transparent)" }}>{revenueEngine.length} drafts</Badge>
@@ -314,7 +510,10 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
             <div className="p-6 pt-5">
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {revenueEngine.length === 0 ? (
-                  <div className="col-span-full py-12 text-center text-sm text-[color:var(--muted-foreground)]">No draft opportunities available.</div>
+                  <div className="col-span-full flex flex-col items-center gap-2 py-12 text-center text-sm text-[color:var(--muted-foreground)]">
+                    <span className="text-[color:var(--foreground)]/80 font-medium">Clear runway</span>
+                    <span>New opportunities appear when intelligence and CRM signals line up.</span>
+                  </div>
                 ) : null}
                 <AnimatePresence>
                 {revenueEngine.map((opp) => (
@@ -327,8 +526,8 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
                   >
                     <div>
                       <div className="flex justify-between items-start mb-3">
-                        <Badge variant="outline" className="text-xs font-medium" style={{ background: "rgba(29,158,117,0.12)", color: "#5DCAA5", borderColor: "rgba(29,158,117,0.24)" }}>{opp.type}</Badge>
-                        <span className="rounded-full border px-2 py-1 text-xs font-semibold" style={{ color: "#5DCAA5", background: "rgba(29,158,117,0.12)", borderColor: "rgba(29,158,117,0.24)" }}>{opp.confidence}%</span>
+                        <Badge variant="outline" className="text-xs font-medium" style={{ background: "rgba(24,95,165,0.12)", color: "#7EB8E8", borderColor: "rgba(24,95,165,0.24)" }}>{opp.type}</Badge>
+                        <span className="rounded-full border px-2 py-1 text-xs font-semibold" style={{ color: "#7EB8E8", background: "rgba(24,95,165,0.12)", borderColor: "rgba(24,95,165,0.24)" }}>{opp.confidence}%</span>
                       </div>
                       <h3 className="text-base font-semibold text-[color:var(--foreground)]">{opp.client}</h3>
                       <div className="mt-0.5 text-2xl font-light text-[color:var(--foreground)]" data-mono>{opp.value}</div>
@@ -350,7 +549,7 @@ export function DashboardClient({ metrics, alerts, revenueEngine, chartData, off
                         disabled={isPending}
                         onClick={() => startTransition(async () => { await approveOpportunity(opp.id); })}
                         className="flex-1 h-8 text-xs font-medium text-white transition-all duration-200 hover:opacity-90 active:scale-[0.97]"
-                        style={{ background: "#1D9E75" }}
+                        style={{ background: "#185FA5" }}
                         size="sm"
                       >
                         <Check className="mr-1 h-4 w-4" strokeWidth={1.5} /> Approve
