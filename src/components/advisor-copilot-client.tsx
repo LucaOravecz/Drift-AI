@@ -5,14 +5,16 @@ import { Send, RefreshCw, ChevronRight, AlertTriangle, CheckCircle2, Info, FileT
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { CopilotResponse, CopilotResponseSection, WorkflowTrace } from "@/lib/services/copilot.service"
+import { WorkingChain, type WorkingStep } from "./working-chain"
+import { SourcesPanel } from "./sources-panel"
 
 const SUGGESTED_PROMPTS = [
   "Prepare me for my next scheduled meeting",
-  "What tax items need review this month?",
-  "Which clients are at risk of churning?",
-  "What opportunities are we missing across clients?",
-  "What tasks are overdue or need attention today?",
-  "Summarize the current onboarding pipeline",
+  "Show the evidence for the Peterson household IPS constraints",
+  "What compliance flags are currently open?",
+  "Summarize the latest brief for my next client review",
+  "Find the source chunk for the last meeting summary",
+  "What open tasks should I cover in the next meeting?",
 ]
 
 interface Message {
@@ -22,6 +24,8 @@ interface Message {
   response?: CopilotResponse
   error?: string
   loading?: boolean
+  workingSteps?: WorkingStep[]
+  liveAnswer?: string
 }
 
 function newCopilotMessageId(prefix: "u" | "a"): string {
@@ -207,6 +211,24 @@ function AssistantMessage({ msg, onRetry }: { msg: Message; onRetry: (prompt: st
   const [showTrace, setShowTrace] = useState(false)
 
   if (msg.loading) {
+    const hasSteps = (msg.workingSteps?.length ?? 0) > 0 || msg.liveAnswer;
+    if (hasSteps) {
+      return (
+        <div className="flex gap-3">
+          <div className="h-7 w-7 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+            <Bot className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <div className="flex-1 rounded-xl border border-border bg-card p-4 space-y-4">
+            <WorkingChain steps={msg.workingSteps ?? []} />
+            {msg.liveAnswer && (
+              <p className="text-sm text-foreground animate-in fade-in leading-relaxed whitespace-pre-wrap">
+                {msg.liveAnswer}
+              </p>
+            )}
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="flex gap-3">
         <div className="h-7 w-7 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
@@ -246,12 +268,28 @@ function AssistantMessage({ msg, onRetry }: { msg: Message; onRetry: (prompt: st
         <Bot className="h-3.5 w-3.5 text-primary" />
       </div>
       <div className="flex-1 space-y-3">
+        {/* Working Steps */}
+        {msg.workingSteps && msg.workingSteps.length > 0 && (
+          <details className="group">
+            <summary className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none">
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+              Show reasoning steps
+            </summary>
+            <div className="mt-2 pl-2">
+              <WorkingChain steps={msg.workingSteps} />
+            </div>
+          </details>
+        )}
+
         {/* Response sections */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           {msg.response.sections.map((section, i) => (
             <ResponseSection key={i} section={section} />
           ))}
         </div>
+
+        {/* Sources Panel */}
+        <SourcesPanel sources={msg.response.sources} />
 
         {/* Trace toggle */}
         <button
@@ -306,13 +344,13 @@ export function AdvisorCopilotClient() {
 
     startTransition(async () => {
       try {
-        const res = await fetch("/api/copilot", {
+        const res = await fetch("/api/copilot/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: prompt.trim() }),
         })
 
-        if (!res.ok) {
+        if (!res.ok || !res.body) {
           const err = await res.json().catch(() => ({ error: "Unknown error" }))
           setMessages(prev =>
             prev.map(m =>
@@ -324,15 +362,51 @@ export function AdvisorCopilotClient() {
           return
         }
 
-        const data: CopilotResponse = await res.json()
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === loadingMsg.id
-              ? { ...m, loading: false, response: data }
-              : m
-          )
-        )
-      } catch {
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const parts = buffer.split("\n\n")
+          buffer = parts.pop() || ""
+
+          for (const part of parts) {
+            if (part.startsWith("data: ")) {
+              const payloadStr = part.slice("data: ".length)
+              if (!payloadStr.trim()) continue
+              try {
+                const payload = JSON.parse(payloadStr)
+                setMessages(prev => prev.map(m => {
+                  if (m.id !== loadingMsg.id) return m
+
+                  switch (payload.type) {
+                    case "step_start":
+                      return { ...m, workingSteps: [...(m.workingSteps || []), { ...payload, state: "active" }] }
+                    case "step_update":
+                      return { ...m, workingSteps: m.workingSteps?.map(s => s.id === payload.id ? { ...s, ...payload } : s) }
+                    case "step_complete":
+                      return { ...m, workingSteps: m.workingSteps?.map(s => s.id === payload.id ? { ...s, state: "done", evidence: payload.evidence } : s) }
+                    case "token":
+                      return { ...m, liveAnswer: (m.liveAnswer || "") + payload.text }
+                    case "complete":
+                      return { ...m, loading: false, response: payload.response }
+                    case "error":
+                      return { ...m, loading: false, error: payload.message }
+                    default:
+                      return m
+                  }
+                }))
+              } catch (e) {
+                console.error("Failed to parse SSE JSON", e, payloadStr)
+              }
+            }
+          }
+        }
+      } catch (err) {
         setMessages(prev =>
           prev.map(m =>
             m.id === loadingMsg.id

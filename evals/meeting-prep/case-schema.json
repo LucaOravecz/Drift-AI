@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MeetingPrepEvalCase",
+  "type": "object",
+  "required": [
+    "id",
+    "household",
+    "meeting",
+    "evidence",
+    "expected"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "household": { "type": "object" },
+    "meeting": { "type": "object" },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["mustMention", "prohibitedErrors", "expectedCitations", "rubric"],
+      "properties": {
+        "mustMention": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "prohibitedErrors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "expectedCitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rubric": { "type": "object" }
+      }
+    }
+  }
+}

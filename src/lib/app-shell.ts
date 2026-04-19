@@ -58,21 +58,21 @@ export async function getUnreadNotificationCount(userId: string) {
 }
 
 export async function getHeaderSummary(organizationId: string, userId: string) {
-  const [clientCount, draftOpportunityCount, overdueTaskCount, unreadNotificationCount, activeSessionCount] = await Promise.all([
+  const [clientCount, upcomingMeetingCount, pendingVaultCount, unreadNotificationCount, activeSessionCount] = await Promise.all([
     prisma.client.count({
       where: { organizationId },
     }),
-    prisma.opportunity.count({
+    prisma.meeting.count({
       where: {
-        status: { in: ["DRAFT", "PENDING_REVIEW"] },
         client: { organizationId },
+        status: "SCHEDULED",
+        scheduledAt: { gte: new Date() },
       },
     }),
-    prisma.task.count({
+    prisma.document.count({
       where: {
-        userId,
-        isCompleted: false,
-        dueDate: { lt: new Date() },
+        client: { organizationId },
+        status: { in: ["UPLOADED", "QUEUED", "PROCESSING"] },
       },
     }),
     getUnreadNotificationCount(userId),
@@ -83,8 +83,8 @@ export async function getHeaderSummary(organizationId: string, userId: string) {
 
   return {
     clientCount,
-    draftOpportunityCount,
-    overdueTaskCount,
+    upcomingMeetingCount,
+    pendingVaultCount,
     unreadNotificationCount,
     activeSessionCount,
   };

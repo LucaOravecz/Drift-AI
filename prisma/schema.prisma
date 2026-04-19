@@ -39,6 +39,7 @@ model Organization {
   agentTasks       AgentTask[]
   agentOutputs     AgentOutput[]
   agentApprovals   AgentApproval[]
+  households            Household[]
   advDocuments          AdvDocument[]       @relation("orgAdvDocuments")
   form13FFilings        Form13F[]           @relation("org13FFilings")
   gipsComposites        GipsComposite[]     @relation("orgGipsComposites")
@@ -82,6 +83,7 @@ model User {
   sentInvites    UserInvite[] @relation("InviteSender")
   preferences    UserPreference?
   notifications  Notification[]
+  ownedHouseholds Household[] @relation("HouseholdAdvisorOwner")
 
   @@index([organizationId])
   @@index([email])
@@ -140,6 +142,29 @@ model UserPreference {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
+}
+
+model Household {
+  id             String   @id @default(cuid())
+  organizationId String
+  advisorOwnerId String?
+  displayName    String
+  riskProfile    String?
+  taxStatus      String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  advisorOwner   User?        @relation("HouseholdAdvisorOwner", fields: [advisorOwnerId], references: [id], onDelete: SetNull)
+  clients        Client[]
+  documents      Document[]
+  meetings       Meeting[]
+  meetingBriefs  MeetingBrief[]
+
+  @@index([organizationId])
+  @@index([advisorOwnerId])
+  @@map("households")
 }
 
 model UserSession {
@@ -233,6 +258,7 @@ model Client {
   deletedAt      DateTime?
 
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  household           Household?           @relation(fields: [householdId], references: [id], onDelete: SetNull)
   intelligence        IntelligenceProfile?
   opportunities       Opportunity[]
   events              LifeEvent[]
@@ -517,9 +543,16 @@ model OnboardingStep {
 model Document {
   id           String   @id @default(cuid())
   clientId     String
+  organizationId String?
+  householdId  String?
   fileName     String
+  title        String?
   fileSize     Int
   documentType String?  // ESTATE_PLAN, TAX_RETURN, STATEMENT, TRUST_AGREEMENT, INSURANCE, FINANCIAL_PLAN
+  sourceType   String?
+  authorityLevel String?
+  effectiveDate DateTime?
+  jurisdiction String?
   pageCount    Int?
   status       String   @default("UPLOADED") // UPLOADED, QUEUED, PROCESSING, SUMMARIZED, REVIEWED
   summaryText  String?
@@ -529,15 +562,76 @@ model Document {
   deadlines    Json?    // Structured deadlines array
   sourceRef    String?  // Data lineage reference
   storagePath  String?  // S3/GCS object key for file storage
+  tags         Json?
+  rawText      String?
+  parsedSections Json?
+  metadataJson Json?
   uploadedAt   DateTime @default(now())
   deletedAt    DateTime?
 
   client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  household    Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  chunks       DocumentChunk[]
+  reviews      DocumentReview[]
+  revisions    DocumentRevision[]
 
   @@index([clientId])
+  @@index([organizationId])
+  @@index([householdId])
   @@index([documentType])
   @@index([status])
   @@map("documents")
+}
+
+model DocumentChunk {
+  id                 String   @id @default(cuid())
+  documentId         String
+  organizationId     String
+  householdId        String?
+  sectionPath        String
+  text               String
+  tokenCount         Int      @default(0)
+  embeddingVectorRef String?
+  keywordText        String
+  citationLabel      String
+  metadataJson       Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  document           Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([organizationId])
+  @@index([householdId])
+  @@index([citationLabel])
+  @@map("document_chunks")
+}
+
+model DocumentReview {
+  id             String   @id @default(cuid())
+  organizationId String
+  documentId     String
+  reviewType     String
+  summary        String   @db.Text
+  severity       String
+  suggestionsJson Json
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+  reviewerId     String?
+  document       Document @relation(fields: [documentId], references: [id])
+  @@index([organizationId, documentId])
+  @@map("document_reviews")
+}
+
+model DocumentRevision {
+  id             String   @id @default(cuid())
+  documentId     String
+  revisionText   String   @db.Text
+  appliedChanges Json
+  createdAt      DateTime @default(now())
+  document       Document @relation(fields: [documentId], references: [id])
+  @@index([documentId])
+  @@map("document_revisions")
 }
 
 // --------------------------------------------------
@@ -619,6 +713,7 @@ model LifeEvent {
 model Meeting {
   id             String   @id @default(cuid())
   clientId       String
+  householdId    String?
   title          String
   type           String   @default("REVIEW") // REVIEW, INTRO, DISCOVERY, FOLLOWUP, TAX, PLANNING
   scheduledAt    DateTime
@@ -630,12 +725,57 @@ model Meeting {
 
   source         String?     // MANUAL | GOOGLE_CALENDAR
   externalEventId String?    // For synced calendar events
+  rawCalendarContext String?
 
   client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  household      Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  briefs         MeetingBrief[]
 
   @@index([clientId, scheduledAt])
+  @@index([householdId])
   @@index([scheduledAt])
   @@map("meetings")
+}
+
+model MeetingBrief {
+  id                String   @id @default(cuid())
+  organizationId    String
+  householdId       String?
+  meetingId         String
+  status            String   @default("PENDING")
+  schemaJson        Json
+  renderedMarkdown  String?
+  overallConfidence String?
+  generatedAt       DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  pipelineTrace     Json?
+
+  household         Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  meeting           Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  claimVerifications ClaimVerification[]
+
+  @@index([organizationId])
+  @@index([householdId])
+  @@index([meetingId])
+  @@index([status])
+  @@map("meeting_briefs")
+}
+
+model ClaimVerification {
+  id                 String   @id @default(cuid())
+  meetingBriefId     String
+  claimText          String
+  verified           Boolean  @default(false)
+  supportingChunkIds Json
+  failureReason      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  meetingBrief       MeetingBrief @relation(fields: [meetingBriefId], references: [id], onDelete: Cascade)
+
+  @@index([meetingBriefId])
+  @@index([verified])
+  @@map("claim_verifications")
 }
 
 model Task {
@@ -822,6 +962,138 @@ model ComplianceDeadline {
 
   @@index([organizationId, status, dueDate])
   @@map("compliance_deadlines")
+}
+
+model CorpusSource {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  sourceType      String
+  authorityTier   String?
+  jurisdiction    String
+  agency          String
+  baseUrl         String
+  discoveryOnly   Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  documents       CorpusDocument[]
+  ingestionRuns   CorpusIngestionRun[]
+
+  @@index([jurisdiction, agency])
+  @@map("corpus_sources")
+}
+
+model CorpusDocument {
+  id              String   @id @default(cuid())
+  sourceId        String
+  externalId      String
+  title           String
+  subtitle        String?
+  sourceType      String
+  authorityTier   String
+  jurisdiction    String
+  agency          String
+  state           String?
+  documentType    String?
+  formType        String?
+  filerName       String?
+  firmName        String?
+  cik             String?
+  crd             String?
+  secNumber       String?
+  accessionNumber String?
+  amendmentType   String?
+  citation        String?
+  sourceUrl       String
+  sourceHash      String
+  commentStatus   String?
+  publicationDate DateTime?
+  effectiveDate   DateTime?
+  filingDate      DateTime?
+  headings        Json?
+  metadata        Json?
+  rawText         String
+  contentHash     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  source          CorpusSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  chunks          CorpusChunk[]
+
+  @@unique([sourceId, externalId])
+  @@unique([sourceHash])
+  @@index([authorityTier, agency, jurisdiction])
+  @@index([publicationDate])
+  @@index([effectiveDate])
+  @@index([filingDate])
+  @@index([formType])
+  @@index([cik])
+  @@index([crd])
+  @@map("corpus_documents")
+}
+
+model CorpusChunk {
+  id              String   @id @default(cuid())
+  documentId      String
+  ordinal         Int
+  headingPath     String?
+  headingTitle    String?
+  content         String
+  contentHash     String
+  citation        String?
+  sourceUrl       String
+  sourceName      String
+  sourceType      String
+  authorityTier   String
+  jurisdiction    String
+  agency          String
+  state           String?
+  effectiveDate   DateTime?
+  publicationDate DateTime?
+  filingDate      DateTime?
+  formType        String?
+  firmName        String?
+  cik             String?
+  crd             String?
+  metadata        Json?
+  embeddingModel  String?
+  embedding       Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  document        CorpusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, ordinal])
+  @@index([authorityTier, agency, jurisdiction])
+  @@index([publicationDate])
+  @@index([effectiveDate])
+  @@index([filingDate])
+  @@index([formType])
+  @@index([cik])
+  @@index([crd])
+  @@map("corpus_chunks")
+}
+
+model CorpusIngestionRun {
+  id                 String   @id @default(cuid())
+  sourceId           String
+  status             String   @default("RUNNING")
+  mode               String
+  startedAt          DateTime @default(now())
+  completedAt        DateTime?
+  documentsSeen      Int      @default(0)
+  documentsUpserted  Int      @default(0)
+  chunksUpserted     Int      @default(0)
+  errorMessage       String?
+  notes              Json?
+
+  source             CorpusSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, startedAt])
+  @@index([status])
+  @@map("corpus_ingestion_runs")
 }
 
 model AuditLog {
@@ -1220,6 +1492,83 @@ model LoginAttempt {
 
   @@index([identifier, createdAt])
   @@map("login_attempts")
+}
+
+// --------------------------------------------------
+// EVALUATION HARNESS
+// --------------------------------------------------
+
+model EvalCase {
+  id              String   @id @default(cuid())
+  caseId          String   @unique // stable human-readable id, e.g. "quarterly-review-001"
+  meetingType     String   // quarterly_review | tax_planning | prospect_discovery | financial_planning | compliance_review | onboarding_kickoff
+  prompt          String   // the input scenario / meeting context
+  sourceDocuments Json     // evidence chunks available to the pipeline
+  expectedQualities Json   // { mustMention, prohibitedErrors, expectedCitations, rubric }
+  difficulty      String   @default("MEDIUM") // EASY | MEDIUM | HARD
+  tags            String[] // e.g. ["cash_drift", "concentrated_position", "tax"]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  runCases EvalRunCase[]
+
+  @@index([meetingType])
+  @@index([isActive])
+  @@index([tags])
+  @@map("eval_cases")
+}
+
+model EvalRun {
+  id              String   @id @default(cuid())
+  label           String?  // e.g. "v1.3-2026-04-18" for tracking
+  caseCount       Int      @default(0)
+  passedCount     Int      @default(0)
+  failedCount     Int      @default(0)
+  passRate        Float    @default(0)
+  meanFactual     Float    @default(0)
+  meanCitation    Float    @default(0)
+  meanCompliance  Float    @default(0)
+  meanUsefulness  Float    @default(0)
+  meanCompleteness Float   @default(0)
+  failureModes    Json     @default("{}") // { hallucinated: N, weakCitations: N, missingSections: N, genericAdvice: N, complianceRisky: N }
+  configSnapshot  Json?    // model versions, prompt versions, retrieval params
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  durationMs      Int?
+
+  cases EvalRunCase[]
+
+  @@index([label])
+  @@index([startedAt])
+  @@map("eval_runs")
+}
+
+model EvalRunCase {
+  id              String   @id @default(cuid())
+  runId           String
+  caseId          String
+  modelOutput     String?  // the rendered markdown from the pipeline
+  verificationJson Json?   // claim verification results
+  scoreFactual    Int?     // 1-5
+  scoreCitation   Int?     // 1-5
+  scoreCompliance Int?     // 1-5
+  scoreUsefulness Int?     // 1-5
+  scoreCompleteness Int?   // 1-5
+  passed          Boolean  @default(false)
+  failureModes    String[] // e.g. ["hallucinated", "missing_section"]
+  reviewerNotes   String?
+  reviewerUserId  String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  run   EvalRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  case  EvalCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([caseId])
+  @@index([passed])
+  @@map("eval_run_cases")
 }
 
 model AgentApproval {

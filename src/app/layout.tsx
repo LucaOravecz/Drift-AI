@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Mono, DM_Sans, Instrument_Serif } from "next/font/google";
+import { DM_Mono, DM_Sans, Source_Serif_4 } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
@@ -23,9 +23,9 @@ const dmMono = DM_Mono({
   variable: "--font-dm-mono",
 });
 
-const instrumentSerif = Instrument_Serif({
+const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
-  weight: ["400"],
+  weight: ["400", "600"],
   variable: "--font-app-serif",
   display: "swap",
 });
@@ -39,7 +39,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`h-full antialiased light ${GeistSans.variable} ${GeistMono.variable} ${dmSans.variable} ${dmMono.variable} ${instrumentSerif.variable}`}
+      className={`h-full antialiased light ${GeistSans.variable} ${GeistMono.variable} ${dmSans.variable} ${dmMono.variable} ${sourceSerif.variable}`}
       style={{ colorScheme: "light" }}
     >
       <body className="min-h-full flex flex-col bg-[var(--background)] selection:bg-brand-500/30">

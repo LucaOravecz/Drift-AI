@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { ChevronDown, LogOut, Settings, UserCircle2 } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -61,19 +60,6 @@ export function AccountMenu({ currentUser, summary }: AccountMenuProps) {
             </div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator className="bg-white/10" />
-        <DropdownMenuItem onClick={() => window.location.assign("/account")}>
-          <Link href="/account" className="flex items-center gap-2">
-            <UserCircle2 className="h-4 w-4" />
-            Account
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => window.location.assign("/settings")}>
-          <Link href="/settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/10" />
         <form action={signOutAction}>
           <button type="submit" className="flex w-full items-center gap-2 px-2 py-1.5 text-sm text-red-300 transition hover:bg-white/5">

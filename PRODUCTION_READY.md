@@ -11,9 +11,9 @@
 
 ### Security & Compliance (Phase 1)
 ✅ **AI Model Upgrade**
-- Flagship: Claude Opus 4.5
-- Standard: Claude Sonnet 4.5
-- Economy: Claude Haiku 4.5
+- Flagship: Claude Sonnet 4 (2025-05-14)
+- Standard: Claude Haiku 4.5 (2025-10-01)
+- Economy: Claude Haiku 4.5 (2025-10-01)
 - Real cost tracking, no more hallucinations
 
 ✅ **P0 Security Fixes**
@@ -61,7 +61,7 @@ Features:
 ### Production Infrastructure
 ✅ **Database**: PostgreSQL (Neon recommended)
 ✅ **Auth**: Session cookies + MFA + Rate limiting
-✅ **AI**: Anthropic SDK with cost tracking
+✅ **AI**: OpenRouter-backed Claude routing with cost tracking
 ✅ **Billing**: Stripe integration (checkout, portal, webhooks)
 ✅ **Jobs**: Inngest job queue ready
 ✅ **Observability**: Sentry error tracking + Web Vitals
@@ -128,7 +128,7 @@ Before go-live, verify:
 │  └──────────────────────────────────────────────┘  │
 │                        ↓                            │
 │  ┌──────────────────────────────────────────────┐  │
-│  │           AI LAYER (Claude API)              │  │
+│  │           AI LAYER (OpenRouter + Claude)     │  │
 │  ├──────────────────────────────────────────────┤  │
 │  │ • callClaude() — text responses              │  │
 │  │ • callClaudeStructured() — JSON + schema    │  │
@@ -335,7 +335,7 @@ For incident response: See emergency procedures in PRODUCTION_CHECKLIST.md
 
 ---
 
-**Built with**: Next.js 16, Prisma, PostgreSQL, Claude API, Stripe, Inngest  
+**Built with**: Next.js 16, Prisma, PostgreSQL, OpenRouter (Claude), Stripe, Inngest  
 **Team**: Claude Haiku 4.5  
 **Status**: ✅ PRODUCTION READY  
 **Last Updated**: 2026-04-14  

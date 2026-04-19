@@ -11,7 +11,7 @@ interface UseThemeOptions {
  * Stores preference in localStorage and applies to document
  */
 export function useTheme({ storageKey = "theme-preference" }: UseThemeOptions = {}) {
-  const [theme, setTheme] = useState<Theme>("system");
+  const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
   // Initialize theme from localStorage after mount (avoid SSR/hydration mismatch).

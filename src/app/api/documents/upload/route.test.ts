@@ -8,7 +8,7 @@ const {
   appendAuditEvent,
   extractPDFContent,
   inferDocumentType,
-  extract,
+  processDocument,
 } = vi.hoisted(() => ({
   authenticateApiRequest: vi.fn(),
   hasPermission: vi.fn(),
@@ -17,7 +17,7 @@ const {
   appendAuditEvent: vi.fn(),
   extractPDFContent: vi.fn(),
   inferDocumentType: vi.fn(),
-  extract: vi.fn(),
+  processDocument: vi.fn(),
 }));
 
 vi.mock("@/lib/middleware/api-auth", () => ({
@@ -36,7 +36,7 @@ vi.mock("@/lib/services/document.service", () => ({
   DocumentService: {
     extractPDFContent,
     inferDocumentType,
-    extract,
+    processDocument,
   },
 }));
 
@@ -68,12 +68,14 @@ describe("POST /api/documents/upload", () => {
       organizationId: "org_123",
     });
     inferDocumentType.mockResolvedValue({ type: "FINANCIAL_PLAN", confidence: 0.91 });
-    extract.mockResolvedValue({
+    documentCreate.mockResolvedValue({ id: "doc_123" });
+    processDocument.mockResolvedValue({
+      id: "doc_123",
+      summaryText: "Stored summary",
       keyPoints: ["Point 1"],
       actionItems: ["Action 1"],
       riskItems: ["Risk 1"],
     });
-    documentCreate.mockResolvedValue({ id: "doc_123" });
     extractPDFContent.mockResolvedValue("Extracted text");
   });
 
@@ -147,9 +149,11 @@ describe("POST /api/documents/upload", () => {
           clientId: "client_123",
           fileName: "plan.pdf",
           documentType: "FINANCIAL_PLAN",
+          rawText: "Extracted text",
         }),
       }),
     );
+    expect(processDocument).toHaveBeenCalledWith("doc_123", "org_123", "Extracted text");
     expect(appendAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: "org_123",
@@ -157,6 +161,11 @@ describe("POST /api/documents/upload", () => {
         action: "DOCUMENT_UPLOADED",
       }),
     );
-    expect(body.document).toEqual({ id: "doc_123" });
+    expect(body.document).toEqual(
+      expect.objectContaining({
+        id: "doc_123",
+        summaryText: "Stored summary",
+      }),
+    );
   });
 });

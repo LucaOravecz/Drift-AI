@@ -2,18 +2,12 @@
 
 import * as React from "react";
 import {
-  Calculator,
   Calendar,
-  CreditCard,
-  Settings,
-  Smile,
   User,
   Search,
-  Brain,
   Shield,
   FileText,
-  Mail,
-  Zap,
+  MessageSquare,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -99,31 +93,21 @@ export function CommandMenu() {
             </CommandGroup>
           )}
 
-          {results.prospects.length > 0 && (
-            <CommandGroup heading="Prospects">
-              {results.prospects.map((prospect) => (
-                <CommandItem key={prospect.id} onSelect={() => onSelect(`/sales`)}>
-                  <Star className="mr-2 h-4 w-4 text-emerald-500" />
-                  <span>{prospect.name}</span>
-                  <span className="ml-2 text-[10px] text-zinc-500 italic">({prospect.stage})</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
 
-          <CommandGroup heading="Smart Actions">
-            <CommandItem onSelect={() => onSelect("/opportunities")}>
-              <Brain className="mr-2 h-4 w-4 text-primary" />
-              <span>Scan for Revenue Opportunities</span>
+
+          <CommandGroup heading="Actions">
+            <CommandItem onSelect={() => onSelect("/copilot")}>
+              <MessageSquare className="mr-2 h-4 w-4 text-primary" />
+              <span>Open Copilot</span>
               <CommandShortcut>⌘R</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => onSelect("/tax")}>
-              <Zap className="mr-2 h-4 w-4 text-amber-400" />
-              <span>Run Tax Audit</span>
+            <CommandItem onSelect={() => onSelect("/meetings")}>
+              <Calendar className="mr-2 h-4 w-4 text-amber-400" />
+              <span>Open Meeting Prep</span>
             </CommandItem>
-            <CommandItem onSelect={() => onSelect("/documents")}>
+            <CommandItem onSelect={() => onSelect("/vault")}>
               <FileText className="mr-2 h-4 w-4 text-blue-400" />
-              <span>Analyze Document Vault</span>
+              <span>Open Vault</span>
             </CommandItem>
             <CommandItem onSelect={() => onSelect("/compliance")}>
               <Shield className="mr-2 h-4 w-4 text-emerald-400" />
@@ -134,17 +118,17 @@ export function CommandMenu() {
           <CommandSeparator />
           
           <CommandGroup heading="Navigation">
-            <CommandItem onSelect={() => onSelect("/dashboard")}>
-              <Calendar className="mr-2 h-4 w-4" />
-              <span>Dashboard</span>
-            </CommandItem>
             <CommandItem onSelect={() => onSelect("/meetings")}>
-              <Mail className="mr-2 h-4 w-4" />
+              <Calendar className="mr-2 h-4 w-4" />
               <span>Meetings</span>
             </CommandItem>
-            <CommandItem onSelect={() => onSelect("/onboarding")}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Onboarding</span>
+            <CommandItem onSelect={() => onSelect("/clients")}>
+              <User className="mr-2 h-4 w-4" />
+              <span>Clients</span>
+            </CommandItem>
+            <CommandItem onSelect={() => onSelect("/vault")}>
+              <FileText className="mr-2 h-4 w-4" />
+              <span>Vault</span>
             </CommandItem>
           </CommandGroup>
         </CommandList>

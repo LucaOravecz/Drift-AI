@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect } from 'react'
+import { stripScriptTagsFromHtml } from '@/lib/sanitize-client-html'
 
 export type VisualizationType = 'allocation' | 'performance' | 'timeline' | 'risk_profile' | 'chart'
 
@@ -109,7 +110,7 @@ export function VisualizationRenderer({
   // Render SVG or HTML/Mermaid diagram
   return (
     <div className="overflow-auto rounded-lg bg-white/[0.02] p-4 border border-white/5">
-      <div dangerouslySetInnerHTML={{__html: visualization}} />
+      <div dangerouslySetInnerHTML={{ __html: stripScriptTagsFromHtml(visualization) }} />
     </div>
   )
 }

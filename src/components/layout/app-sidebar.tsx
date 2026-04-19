@@ -5,23 +5,10 @@ import {
   Users,
   Briefcase,
   Folder,
-  FileText,
-  History,
-  TrendingDown,
-  Target,
-  Workflow,
-  Sparkles,
-  UserPlus,
-  Mail,
-  DollarSign,
-  FileCheck,
-  Settings,
-  CircleHelp,
+  Shield,
   LogOut,
   Search,
   Plus,
-  ChevronDown,
-  UserCog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,31 +26,17 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ComponentType } from "react";
 import type { BrandingSnapshot } from "@/lib/brand-config";
 import { signOutAction } from "@/lib/product-actions";
 
-/** Core wedge: meeting lifecycle + compliance + client vault */
 const primaryNav = [
-  { title: "Assistant", url: "/copilot", icon: MessageSquare },
-  { title: "Clients", url: "/clients", icon: Users },
+  { title: "Copilot", url: "/copilot", icon: MessageSquare },
   { title: "Meetings", url: "/meetings", icon: Briefcase },
-  { title: "Vault", url: "/documents", icon: Folder },
-  { title: "Compliance", url: "/compliance", icon: FileText },
-  { title: "Tax & Planning", url: "/tlh", icon: TrendingDown },
-  { title: "History", url: "/audit", icon: History },
-] as const;
-
-/** Secondary tools — collapsed by default */
-const practiceNav = [
-  { title: "Opportunities", url: "/opportunities", icon: Target },
-  { title: "Workflows", url: "/triggers", icon: Workflow },
-  { title: "Value Hub", url: "/value", icon: Sparkles },
-  { title: "Onboarding", url: "/onboarding", icon: UserPlus },
-  { title: "Communications", url: "/communications", icon: Mail },
-  { title: "IPS & Proposals", url: "/proposals", icon: FileCheck },
-  { title: "Billing & Fees", url: "/billing", icon: DollarSign },
+  { title: "Clients", url: "/clients", icon: Users },
+  { title: "Vault", url: "/vault", icon: Folder },
+  { title: "Compliance", url: "/compliance", icon: Shield },
 ] as const;
 
 function initials(snapshot: BrandingSnapshot) {
@@ -114,14 +87,11 @@ function NavItem({
 
 export function AppSidebar({
   branding,
-  canManageUsers = false,
 }: {
   branding: BrandingSnapshot;
-  canManageUsers?: boolean;
 }) {
   const pathname = usePathname();
   const { setOpenMobile, isMobile } = useSidebar();
-  const [practiceOpen, setPracticeOpen] = useState(false);
 
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
@@ -190,59 +160,13 @@ export function AppSidebar({
               {primaryNav.map((item) => (
                 <NavItem key={item.url} item={item} isActive={linkIsActive(item.url)} />
               ))}
-              {canManageUsers && (
-                <NavItem
-                  item={{ title: "Admin Users", url: "/admin/users", icon: UserCog }}
-                  isActive={linkIsActive("/admin/users")}
-                />
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup className="mt-4">
-          <button
-            type="button"
-            onClick={() => setPracticeOpen((v) => !v)}
-            className="mb-1 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[color:var(--muted-foreground)] transition-colors hover:bg-[color:var(--sidebar-accent)]"
-          >
-            <span>Your practice</span>
-            <ChevronDown
-              className={cn(
-                "h-3.5 w-3.5 transition-transform duration-150",
-                practiceOpen ? "rotate-180" : ""
-              )}
-              strokeWidth={1.6}
-            />
-          </button>
-          {practiceOpen && (
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {practiceNav.map((item) => (
-                  <NavItem key={item.url} item={item} isActive={linkIsActive(item.url)} />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          )}
         </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="border-t border-[color:var(--sidebar-border)] px-2 py-3 group-data-[collapsible=icon]:hidden">
         <div className="flex flex-col gap-0.5">
-          <Link
-            href="/settings"
-            className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-[color:var(--sidebar-foreground)] transition-colors hover:bg-[color:var(--sidebar-accent)] hover:text-[color:var(--sidebar-accent-foreground)]"
-          >
-            <Settings className="h-[15px] w-[15px] shrink-0 opacity-80" strokeWidth={1.5} />
-            Settings
-          </Link>
-          <Link
-            href="/help"
-            className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-[color:var(--sidebar-foreground)] transition-colors hover:bg-[color:var(--sidebar-accent)] hover:text-[color:var(--sidebar-accent-foreground)]"
-          >
-            <CircleHelp className="h-[15px] w-[15px] shrink-0 opacity-80" strokeWidth={1.5} />
-            Help
-          </Link>
           <form action={signOutAction} className="w-full">
             <button
               type="submit"

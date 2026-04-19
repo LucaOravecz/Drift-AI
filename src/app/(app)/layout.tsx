@@ -26,37 +26,12 @@ export default async function AppLayout({
     role: session.user.role,
     avatarUrl: session.user.avatarUrl,
   };
-  const canManageUsers = ["ADMIN", "SENIOR_ADVISOR"].includes(session.user.role);
 
   return (
     <TooltipProvider>
       <SidebarProvider>
         <div className="relative flex h-screen w-full flex-1 overflow-hidden" style={{ background: "var(--background)" }}>
-          <div
-            className="drift-orb"
-            data-orb="teal"
-            style={{
-              width: "400px",
-              height: "400px",
-              background: "rgba(29,158,117,0.12)",
-              top: "-120px",
-              right: "-80px",
-              animationDelay: "0s",
-            }}
-          />
-          <div
-            className="drift-orb"
-            data-orb="blue"
-            style={{
-              width: "300px",
-              height: "300px",
-              background: "rgba(55,138,221,0.09)",
-              bottom: "0",
-              left: "200px",
-              animationDelay: "-4s",
-            }}
-          />
-          <AppSidebar branding={branding} canManageUsers={canManageUsers} />
+          <AppSidebar branding={branding} />
           <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
             <TopHeader
               branding={branding}

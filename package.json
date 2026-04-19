@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:webpack": "next dev --webpack",
+    "dev": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/drift_test next dev",
+    "dev:webpack": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/drift_test next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
@@ -23,7 +23,9 @@
     "db:stop": "docker compose -f docker-compose.postgres.yml down",
     "db:migrate:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/drift_test DIRECT_URL=postgresql://postgres:postgres@127.0.0.1:5432/drift_test prisma migrate deploy",
     "db:seed:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/drift_test DIRECT_URL=postgresql://postgres:postgres@127.0.0.1:5432/drift_test tsx prisma/seed.ts",
-    "ops:bootstrap": "npm run db:start && sleep 5 && npm run db:migrate:local && npm run db:seed:local"
+    "ops:bootstrap": "npm run db:start && sleep 5 && npm run db:migrate:local && npm run db:seed:local",
+    "corpus:build": "tsx scripts/build-drift-corpus.ts",
+    "eval:meeting-prep": "tsx evals/meeting-prep/runner.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

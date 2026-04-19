@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { Settings } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { CommandMenu } from "./command-menu";
 import { IntelligencePulse } from "../intelligence-pulse";
@@ -18,8 +16,8 @@ interface TopHeaderProps {
   };
   summary: {
     clientCount: number;
-    draftOpportunityCount: number;
-    overdueTaskCount: number;
+    upcomingMeetingCount: number;
+    pendingVaultCount: number;
     unreadNotificationCount: number;
     activeSessionCount: number;
   };
@@ -60,7 +58,7 @@ export function TopHeader({ branding, currentUser, summary, notifications, unrea
       >
         <span className="text-[11px] font-medium">{branding.shortName}</span>
         <span className="opacity-25">/</span>
-        <span className="text-[11px] font-semibold">Intelligence</span>
+        <span className="text-[11px] font-semibold">Meeting Prep</span>
       </div>
 
       <div className="flex flex-1 items-center justify-center gap-4">
@@ -73,12 +71,6 @@ export function TopHeader({ branding, currentUser, summary, notifications, unrea
       </div>
       <div className="flex items-center gap-3">
         <NotificationsMenu notifications={notifications} unreadCount={unreadCount} />
-        <Link
-          href="/settings"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--muted)] text-[color:var(--muted-foreground)] transition-all duration-200 hover:scale-[1.02] hover:bg-[color:var(--secondary)] hover:text-[color:var(--foreground)]"
-        >
-          <Settings className="h-4 w-4" strokeWidth={1.5} />
-        </Link>
         <ThemeToggle />
         <AccountMenu currentUser={currentUser} summary={summary} />
       </div>

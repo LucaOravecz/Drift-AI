@@ -163,10 +163,19 @@ export type FeatureRoute =
   | 'RESEARCH_MEMO'
   | 'CLIENT_SUMMARY'
   | 'SENTIMENT_ANALYSIS'
+  | 'MEETING_PREP_CLASSIFY'
+  | 'MEETING_PREP_QUERY_REWRITE'
+  | 'MEETING_PREP_HYDE'
+  | 'MEETING_PREP_RERANK'
+  | 'MEETING_PREP_EXTRACT'
+  | 'MEETING_PREP_DRAFT'
+  | 'MEETING_PREP_CRITIQUE'
+  | 'MEETING_PREP_REGENERATE'
+  | 'MEETING_PREP_FORMAT_FINAL'
   | 'GENERAL'
 
 const FEATURE_TIER: Record<FeatureRoute, ModelTier> = {
-  BRIEF_GENERATION:     'standard',
+  BRIEF_GENERATION:     'flagship',
   OUTREACH_DRAFT:       'standard',
   COMPLIANCE_SCAN:      'standard',
   OPPORTUNITY_REASONING:'flagship',
@@ -174,6 +183,15 @@ const FEATURE_TIER: Record<FeatureRoute, ModelTier> = {
   RESEARCH_MEMO:        'flagship',
   CLIENT_SUMMARY:       'economy',
   SENTIMENT_ANALYSIS:   'economy',
+  MEETING_PREP_CLASSIFY: 'economy',
+  MEETING_PREP_QUERY_REWRITE: 'economy',
+  MEETING_PREP_HYDE: 'standard',
+  MEETING_PREP_RERANK: 'standard',
+  MEETING_PREP_EXTRACT: 'standard',
+  MEETING_PREP_DRAFT: 'flagship',
+  MEETING_PREP_CRITIQUE: 'flagship',
+  MEETING_PREP_REGENERATE: 'flagship',
+  MEETING_PREP_FORMAT_FINAL: 'standard',
   GENERAL:              'standard',
 }
 

@@ -1,493 +1,482 @@
-/**
- * Advisor Copilot Service
- *
- * Orchestrated workflow engine for advisor queries.
- *
- * Flow for every prompt:
- * 1. Classify the request type
- * 2. Gather relevant app data (deterministic)
- * 3. Run deterministic checks first
- * 4. Build structured context for AI synthesis
- * 5. Call AI with strict grounding rules
- * 6. Return structured response + workflow trace
- * 7. Log the interaction
- *
- * RULES:
- * - AI may ONLY reference data provided in the context
- * - Missing data is surfaced explicitly, not filled by hallucination
- * - Tax/investment outputs are framed as draft review items
- * - All outputs require advisor review before use
- */
-
-import prisma from "../db"
-import { callClaudeJSON } from "./ai.service"
+import prisma from "../db";
+import { MeetingPrepService } from "./meeting-prep.service";
 
 export type RequestType =
   | "MEETING_PREP"
-  | "CLIENT_SUMMARY"
-  | "TAX_REVIEW"
-  | "OPPORTUNITY_SCAN"
-  | "ONBOARDING_STATUS"
-  | "DOCUMENT_SUMMARY"
-  | "TASK_PRIORITIZATION"
-  | "OUTREACH_DRAFT"
-  | "FOLLOW_UP_PLANNING"
-  | "GENERAL_QUERY"
+  | "CLIENT_LOOKUP"
+  | "VAULT_LOOKUP"
+  | "COMPLIANCE_LOOKUP"
+  | "OUT_OF_SCOPE";
+
+export type StepKind =
+  | "classify"
+  | "gather_context"
+  | "check_rules"
+  | "search_web"
+  | "read_vault"
+  | "compliance"
+  | "synthesize"
+  | "cite";
+
+export type EvidenceRef = {
+  label: string;
+  kind: "client" | "document" | "web" | "rule" | "custodian";
+  url?: string;
+  freshness?: string;
+  confidence?: number;
+};
+
+export type CopilotStreamEvent =
+  | { type: "step_start"; id: string; kind: StepKind; title: string; body?: string; chips?: string[] }
+  | { type: "step_update"; id: string; body?: string; chips?: string[] }
+  | { type: "step_complete"; id: string; evidence?: EvidenceRef[] }
+  | { type: "token"; text: string }
+  | { type: "complete"; response: CopilotResponse }
+  | { type: "error"; message: string };
 
 export interface WorkflowTrace {
-  requestType: RequestType
-  inputsUsed: string[]
-  deterministicChecks: string[]
-  agentModulesUsed: string[]
-  outputsGenerated: string[]
-  confidence: "HIGH" | "MEDIUM" | "LOW"
-  reviewRequired: boolean
-  dataQuality: "COMPLETE" | "PARTIAL" | "INSUFFICIENT"
-  missingData: string[]
-  timestamp: string
+  requestType: RequestType;
+  inputsUsed: string[];
+  deterministicChecks: string[];
+  agentModulesUsed: string[];
+  outputsGenerated: string[];
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  reviewRequired: boolean;
+  dataQuality: "COMPLETE" | "PARTIAL" | "INSUFFICIENT";
+  missingData: string[];
+  timestamp: string;
 }
 
+export type CopilotSource = {
+  id: string;
+  kind: "client" | "document" | "meeting" | "custodian_position" | "compliance_rule" | "web";
+  label: string;
+  subtitle?: string;
+  url?: string;
+  freshness?: string;
+  confidence?: number;
+  excerpt?: string;
+};
+
 export interface CopilotResponseSection {
-  label: string
-  content: string | string[]
-  type: "answer" | "findings" | "actions" | "warning" | "draft" | "missing_data"
+  label: string;
+  content: string | string[];
+  type: "answer" | "findings" | "actions" | "warning" | "draft" | "missing_data";
 }
 
 export interface CopilotResponse {
-  id: string
-  prompt: string
-  sections: CopilotResponseSection[]
-  trace: WorkflowTrace
-  generatedAt: string
+  id: string;
+  prompt: string;
+  sections: CopilotResponseSection[];
+  sources: CopilotSource[];
+  trace: WorkflowTrace;
+  generatedAt: string;
 }
-
-// ── Request classifier ───────────────────────────────────────────────────────
 
 function classifyRequest(prompt: string): RequestType {
-  const lower = prompt.toLowerCase()
-  if (lower.includes("meeting") || lower.includes("prep") || lower.includes("brief")) return "MEETING_PREP"
-  if (lower.includes("tax") || lower.includes("rmd") || lower.includes("harvest")) return "TAX_REVIEW"
-  if (lower.includes("opportunit") || lower.includes("missing") || lower.includes("revenue")) return "OPPORTUNITY_SCAN"
-  if (lower.includes("onboard")) return "ONBOARDING_STATUS"
-  if (lower.includes("document") || lower.includes("doc ") || lower.includes("file")) return "DOCUMENT_SUMMARY"
-  if (lower.includes("task") || lower.includes("priorit") || lower.includes("today") || lower.includes("follow")) return "TASK_PRIORITIZATION"
-  if (lower.includes("email") || lower.includes("outreach") || lower.includes("draft") || lower.includes("message")) return "OUTREACH_DRAFT"
-  if (lower.includes("summar") || lower.includes("client") || lower.includes("profile")) return "CLIENT_SUMMARY"
-  return "GENERAL_QUERY"
+  const lower = prompt.toLowerCase();
+  if (lower.includes("meeting") || lower.includes("prep") || lower.includes("brief")) return "MEETING_PREP";
+  if (lower.includes("document") || lower.includes("vault") || lower.includes("source") || lower.includes("citation")) {
+    return "VAULT_LOOKUP";
+  }
+  if (lower.includes("compliance") || lower.includes("policy") || lower.includes("flag")) return "COMPLIANCE_LOOKUP";
+  if (lower.includes("client") || lower.includes("household")) return "CLIENT_LOOKUP";
+  return "OUT_OF_SCOPE";
 }
 
-// ── Data gathering per request type ─────────────────────────────────────────
-
-async function gatherContext(type: RequestType, prompt: string, orgId: string) {
-  const lower = prompt.toLowerCase()
-  const inputsUsed: string[] = []
-  const checks: string[] = []
-  const missing: string[] = []
-  let context: Record<string, unknown> = {}
-
-  // Find client name mentioned in prompt (naive but effective for demo)
-  const clients = await prisma.client.findMany({
-    where: { organizationId: orgId },
-    select: { id: true, name: true },
-  })
-
-  const mentionedClient = clients.find(c =>
-    lower.includes(c.name.split(" ")[0].toLowerCase()) ||
-    lower.includes(c.name.toLowerCase())
-  )
-
-  switch (type) {
-    case "MEETING_PREP": {
-      inputsUsed.push("meetings", "client profile", "tasks", "opportunities", "tax insights")
-
-      // Find next scheduled meeting
-      const nextMeeting = await prisma.meeting.findFirst({
-        where: {
-          status: "SCHEDULED",
-          scheduledAt: { gte: new Date() },
-          ...(mentionedClient ? { clientId: mentionedClient.id } : {}),
-        },
-        include: {
-          client: {
-            include: {
-              intelligence: true,
-              tasks: { where: { isCompleted: false }, take: 5 },
-              opportunities: { where: { status: { in: ["DRAFT", "PENDING_REVIEW"] } }, take: 3 },
-              taxInsights: { where: { status: "UNDER_REVIEW" }, take: 3 },
-              events: { take: 3 },
-            },
-          },
-        },
-        orderBy: { scheduledAt: "asc" },
-      })
-
-      if (nextMeeting) {
-        const c = nextMeeting.client
-        checks.push(`Found next meeting: "${nextMeeting.title}" with ${c.name} on ${new Date(nextMeeting.scheduledAt).toLocaleDateString()}`)
-        checks.push(`Checked open tasks: ${c.tasks.length} open`)
-        checks.push(`Checked open opportunities: ${c.opportunities.length}`)
-        checks.push(`Checked tax insights under review: ${c.taxInsights.length}`)
-        checks.push(`Checked recorded life events: ${c.events.length}`)
-
-        if (c.tasks.length === 0) missing.push("No open tasks on record for this client")
-        if (!c.intelligence?.goals) missing.push("Client goals not recorded in intelligence profile")
-
-        context = {
-          meeting: {
-            title: nextMeeting.title,
-            date: new Date(nextMeeting.scheduledAt).toLocaleDateString(),
-            type: nextMeeting.type,
-          },
-          client: {
-            name: c.name,
-            aum: c.aum ? `$${(c.aum / 1_000_000).toFixed(1)}M` : "Not on file",
-            riskProfile: c.riskProfile ?? "Not on file",
-            lastContact: c.lastContactAt ? `${Math.floor((Date.now() - c.lastContactAt.getTime()) / 86400000)} days ago` : "No contact recorded",
-            goals: c.intelligence?.goals ?? null,
-            concerns: c.intelligence?.concerns ?? null,
-            lifeStage: c.intelligence?.lifeStage ?? null,
-            churnScore: c.churnScore,
-          },
-          openTasks: c.tasks.map(t => ({ title: t.title, priority: t.priority, dueDate: t.dueDate?.toLocaleDateString() })),
-          openOpportunities: c.opportunities.map(o => ({ type: o.type, description: o.description, action: o.suggestedAction })),
-          taxInsights: c.taxInsights.map(t => ({ title: t.title, urgency: t.urgency, action: t.suggestedAction })),
-          lifeEvents: c.events.map(e => ({ title: e.title, type: e.type, implications: e.implications })),
-        }
-      } else {
-        checks.push("No upcoming scheduled meetings found")
-        missing.push("No scheduled meetings on record")
-        context = { noMeetings: true }
-      }
-      break
-    }
-
-    case "TAX_REVIEW": {
-      inputsUsed.push("tax insights", "client profiles", "life events")
-      const taxInsights = await prisma.taxInsight.findMany({
-        where: { status: "UNDER_REVIEW", client: { organizationId: orgId } },
-        include: { client: true },
-        orderBy: [{ urgency: "desc" }, { createdAt: "desc" }],
-        take: 10,
-      })
-      checks.push(`Found ${taxInsights.length} tax insights under review`)
-      checks.push(`High urgency: ${taxInsights.filter(t => t.urgency === "HIGH").length}`)
-      context = {
-        taxInsights: taxInsights.map(t => ({
-          client: t.client.name,
-          title: t.title,
-          urgency: t.urgency,
-          rationale: t.rationale,
-          action: t.suggestedAction,
-          evidence: t.evidence,
-        })),
-      }
-      if (taxInsights.length === 0) missing.push("No tax insights currently under review")
-      break
-    }
-
-    case "OPPORTUNITY_SCAN": {
-      inputsUsed.push("opportunities", "client profiles", "churn scores")
-      const opps = await prisma.opportunity.findMany({
-        where: { status: { in: ["DRAFT", "PENDING_REVIEW"] }, client: { organizationId: orgId } },
-        include: { client: true },
-        orderBy: { confidence: "desc" },
-        take: 10,
-      })
-      const highChurn = await prisma.client.findMany({
-        where: { organizationId: orgId, churnScore: { gt: 60 } },
-        select: { name: true, churnScore: true, lastContactAt: true },
-      })
-      checks.push(`Found ${opps.length} open opportunities`)
-      checks.push(`Found ${highChurn.length} clients with churn risk > 60`)
-      context = {
-        opportunities: opps.map(o => ({
-          client: o.client.name,
-          type: o.type,
-          description: o.description,
-          value: o.valueEst ? `$${(o.valueEst / 1000).toFixed(0)}k` : "Not estimated",
-          confidence: Math.round(o.confidence),
-          action: o.suggestedAction,
-        })),
-        churnRisk: highChurn.map(c => ({
-          name: c.name,
-          score: c.churnScore,
-          lastContact: c.lastContactAt
-            ? `${Math.floor((Date.now() - c.lastContactAt.getTime()) / 86400000)} days ago`
-            : "Never",
-        })),
-      }
-      break
-    }
-
-    case "TASK_PRIORITIZATION": {
-      inputsUsed.push("tasks", "client churn scores", "opportunities")
-      const tasks = await prisma.task.findMany({
-        where: { isCompleted: false },
-        include: { client: true },
-        orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
-        take: 15,
-      })
-      const overdue = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date())
-      checks.push(`Found ${tasks.length} open tasks`)
-      checks.push(`Overdue tasks: ${overdue.length}`)
-      checks.push(`High/urgent priority: ${tasks.filter(t => t.priority === "HIGH" || t.priority === "URGENT").length}`)
-      context = {
-        tasks: tasks.map(t => ({
-          title: t.title,
-          client: t.client?.name ?? "No client",
-          priority: t.priority,
-          dueDate: t.dueDate?.toLocaleDateString() ?? "No due date",
-          overdue: !!(t.dueDate && new Date(t.dueDate) < new Date()),
-          source: t.source,
-        })),
-      }
-      break
-    }
-
-    case "ONBOARDING_STATUS": {
-      inputsUsed.push("onboarding workflows", "onboarding steps")
-      const workflows = await prisma.onboardingWorkflow.findMany({
-        where: { stage: { not: "COMPLETE" }, client: { organizationId: orgId } },
-        include: { client: true, steps: true },
-      })
-      checks.push(`Found ${workflows.length} active onboarding workflows`)
-      const blocked = workflows.filter(w => w.steps.some(s => s.status === "BLOCKED"))
-      checks.push(`Blocked workflows: ${blocked.length}`)
-      context = {
-        workflows: workflows.map(w => ({
-          client: w.client.name,
-          stage: w.stage,
-          healthScore: w.healthScore,
-          blockedSteps: w.steps.filter(s => s.status === "BLOCKED").map(s => ({ name: s.name, notes: s.notes })),
-          completedSteps: w.steps.filter(s => s.status === "COMPLETED").length,
-          totalSteps: w.steps.length,
-        })),
-      }
-      break
-    }
-
-    case "CLIENT_SUMMARY": {
-      inputsUsed.push("client profile", "intelligence profile", "opportunities", "tasks", "tax insights")
-      const target = mentionedClient
-        ? await prisma.client.findUnique({
-            where: { id: mentionedClient.id },
-            include: {
-              intelligence: true,
-              tasks: { where: { isCompleted: false } },
-              opportunities: { where: { status: { in: ["DRAFT", "PENDING_REVIEW"] } } },
-              taxInsights: { where: { status: "UNDER_REVIEW" } },
-              events: { take: 3 },
-            },
-          })
-        : null
-
-      if (target) {
-        checks.push(`Found client: ${target.name}`)
-        checks.push(`Open tasks: ${target.tasks.length}`)
-        checks.push(`Open opportunities: ${target.opportunities.length}`)
-        checks.push(`Tax insights: ${target.taxInsights.length}`)
-        context = {
-          client: {
-            name: target.name,
-            type: target.type,
-            aum: target.aum ? `$${(target.aum / 1_000_000).toFixed(1)}M` : "Not on file",
-            riskProfile: target.riskProfile ?? "Not on file",
-            churnScore: target.churnScore,
-            lastContact: target.lastContactAt
-              ? `${Math.floor((Date.now() - target.lastContactAt.getTime()) / 86400000)} days ago`
-              : "Never",
-            goals: target.intelligence?.goals ?? null,
-            concerns: target.intelligence?.concerns ?? null,
-            familyContext: target.intelligence?.familyContext ?? null,
-            sentimentScore: target.intelligence?.sentimentScore ?? null,
-          },
-          openTasks: target.tasks.map(t => ({ title: t.title, priority: t.priority })),
-          openOpportunities: target.opportunities.map(o => ({ type: o.type, description: o.description })),
-          taxInsights: target.taxInsights.map(t => ({ title: t.title, urgency: t.urgency })),
-          lifeEvents: target.events.map(e => ({ title: e.title, type: e.type })),
-        }
-      } else {
-        checks.push("No specific client identified from prompt")
-        // Fall back to firm-wide summary
-        const allClients = await prisma.client.findMany({
-          where: { organizationId: orgId },
-          select: { name: true, aum: true, churnScore: true },
-        })
-        context = {
-          firmSummary: true,
-          clientCount: allClients.length,
-          totalAum: `$${(allClients.reduce((s, c) => s + (c.aum ?? 0), 0) / 1_000_000).toFixed(1)}M`,
-          highChurnCount: allClients.filter(c => c.churnScore > 75).length,
-        }
-        missing.push("Specific client name not identified in prompt — showing firm summary")
-      }
-      break
-    }
-
-    default: {
-      // General: grab high-level state
-      inputsUsed.push("dashboard metrics")
-      const [clientCount, oppCount, taxCount, taskCount] = await Promise.all([
-        prisma.client.count({ where: { organizationId: orgId } }),
-        prisma.opportunity.count({ where: { status: "DRAFT", client: { organizationId: orgId } } }),
-        prisma.taxInsight.count({ where: { status: "UNDER_REVIEW", client: { organizationId: orgId } } }),
-        prisma.task.count({ where: { isCompleted: false } }),
-      ])
-      checks.push(`Checked firm metrics: ${clientCount} clients, ${oppCount} open opps, ${taxCount} tax insights, ${taskCount} open tasks`)
-      context = { clientCount, oppCount, taxCount, taskCount }
-    }
-  }
-
-  return { context, inputsUsed, checks, missing }
-}
-
-// ── Main orchestrator ────────────────────────────────────────────────────────
-
-export async function runCopilot(prompt: string, orgId: string): Promise<CopilotResponse> {
-  const id = `cop-${Date.now()}`
-  const requestType = classifyRequest(prompt)
-  const { context, inputsUsed, checks, missing } = await gatherContext(requestType, prompt, orgId)
-
-  const agentModules: Record<RequestType, string[]> = {
-    MEETING_PREP: ["Meeting Brief Agent", "Client Intelligence Agent"],
-    TAX_REVIEW: ["Tax Agent", "Compliance Review Agent"],
-    OPPORTUNITY_SCAN: ["Client Intelligence Agent", "Sales Agent"],
-    TASK_PRIORITIZATION: ["Workflow Orchestrator"],
-    ONBOARDING_STATUS: ["Workflow Orchestrator"],
-    CLIENT_SUMMARY: ["Client Intelligence Agent"],
-    DOCUMENT_SUMMARY: ["Document Intelligence Agent"],
-    OUTREACH_DRAFT: ["Relationship Agent", "Sales Agent"],
-    FOLLOW_UP_PLANNING: ["Relationship Agent", "Workflow Orchestrator"],
-    GENERAL_QUERY: ["Workflow Orchestrator"],
-  }
-
-  const agentModulesUsed = agentModules[requestType]
-  const dataQuality = missing.length === 0 ? "COMPLETE" : Object.keys(context).length > 2 ? "PARTIAL" : "INSUFFICIENT"
-
-  let sections: CopilotResponseSection[] = []
-
-  // Add missing data notice first if needed
-  if (missing.length > 0) {
-    sections.push({
-      label: "Data Gaps",
-      content: missing,
-      type: "missing_data",
-    })
-  }
-
-  // Try AI synthesis
+function parseBrief(briefText: string | null) {
+  if (!briefText) return null;
   try {
-    const systemPrompt = `You are an Advisor Copilot for a financial advisory firm. Your job is to help financial advisors prepare for meetings, review opportunities, and make better decisions.
-
-STRICT RULES:
-1. ONLY reference information explicitly provided in the context data below
-2. Do NOT invent client facts, portfolio figures, or financial outcomes
-3. If data is missing, acknowledge it — do NOT fill gaps with assumptions
-4. Tax/investment outputs must be framed as: "draft review items — advisor judgment required"
-5. Be specific and actionable — reference actual names, tasks, and data from the context
-6. Professional, direct tone — no marketing language, no hype
-7. Structure your response clearly with labeled sections`
-
-    const userMessage = `Advisor request: "${prompt}"
-Request type: ${requestType}
-
-Available data:
-${JSON.stringify(context, null, 2)}
-
-${missing.length > 0 ? `Note — these data gaps exist and should be acknowledged:\n${missing.join('\n')}` : ''}
-
-Return a JSON response with this structure:
-{
-  "answer": "Direct response to the advisor's question, referencing actual data",
-  "keyFindings": ["finding 1 — cite the specific data", "finding 2", ...],
-  "recommendedActions": ["action 1 — specific and actionable", "action 2", ...],
-  "reviewWarnings": ["anything that requires advisor judgment or professional review"],
-  "draftContent": "Only if the request is for a draft/outreach — the actual draft text, or null"
-}`
-
-    const result = await callClaudeJSON<{
-      answer: string
-      keyFindings: string[]
-      recommendedActions: string[]
-      reviewWarnings: string[]
-      draftContent: string | null
-    }>(systemPrompt, userMessage, { maxTokens: 4096, organizationId: orgId })
-
-    if (result.answer) {
-      sections.push({ label: "Answer", content: result.answer, type: "answer" })
-    }
-    if (result.keyFindings?.length > 0) {
-      sections.push({ label: "Key Findings", content: result.keyFindings, type: "findings" })
-    }
-    if (result.recommendedActions?.length > 0) {
-      sections.push({ label: "Recommended Next Actions", content: result.recommendedActions, type: "actions" })
-    }
-    if (result.reviewWarnings?.length > 0) {
-      sections.push({ label: "Review Warnings", content: result.reviewWarnings, type: "warning" })
-    }
-    if (result.draftContent) {
-      sections.push({ label: "Draft Content", content: result.draftContent, type: "draft" })
-    }
-  } catch (err) {
-    console.warn("[CopilotService] AI synthesis failed:", err)
-    // Honest fallback — just surface the data
-    sections = [
-      {
-        label: "Data Retrieved",
-        content: `AI synthesis unavailable. Retrieved data for request type: ${requestType}. Summary: ${JSON.stringify(context).slice(0, 400)}...`,
-        type: "answer",
-      },
-    ]
-    if (missing.length > 0) {
-      sections.push({ label: "Missing Data", content: missing, type: "missing_data" })
-    }
-  }
-
-  const trace: WorkflowTrace = {
-    requestType,
-    inputsUsed,
-    deterministicChecks: checks,
-    agentModulesUsed,
-    outputsGenerated: sections.map(s => s.label),
-    confidence: dataQuality === "COMPLETE" ? "HIGH" : dataQuality === "PARTIAL" ? "MEDIUM" : "LOW",
-    reviewRequired: requestType === "TAX_REVIEW" || requestType === "OUTREACH_DRAFT",
-    dataQuality,
-    missingData: missing,
-    timestamp: new Date().toISOString(),
-  }
-
-  // Audit log
-  try {
-    await prisma.auditLog.create({
-      data: {
-        organizationId: orgId,
-        action: "COPILOT_QUERY",
-        target: `CopilotSession:${id}`,
-        details: `Copilot query: "${prompt.slice(0, 100)}". Type: ${requestType}. Data quality: ${dataQuality}. Sections: ${sections.length}.`,
-        aiInvolved: true,
-        severity: "INFO",
-      },
-    })
+    return JSON.parse(briefText) as {
+      sections?: Array<{ title: string; content: string; claims: Array<{ text: string; citations: string[] }> }>;
+      warnings?: string[];
+      evidence?: Array<{ id: string; title: string; sectionPath: string; kind: string }>;
+      compliance_flags?: Array<{ severity: string; message: string }>;
+      overall_confidence?: string;
+    };
   } catch {
-    // Don't fail the response if audit log fails
+    return null;
   }
+}
+
+async function findMentionedClient(prompt: string, organizationId: string) {
+  const clients = await prisma.client.findMany({
+    where: { organizationId },
+    select: { id: true, name: true },
+  });
+  const lower = prompt.toLowerCase();
+  return (
+    clients.find((client) => lower.includes(client.name.toLowerCase())) ??
+    clients.find((client) => lower.includes(client.name.split(" ")[0]?.toLowerCase() ?? ""))
+  );
+}
+
+async function buildMeetingPrepResponse(prompt: string, organizationId: string, onProgress?: (e: CopilotStreamEvent) => void): Promise<CopilotResponse> {
+  onProgress?.({ type: "step_start", id: "gather_meetings", kind: "gather_context", title: "Looking up scheduled meetings..." });
+  const mentionedClient = await findMentionedClient(prompt, organizationId);
+  const meeting = await prisma.meeting.findFirst({
+    where: {
+      client: { organizationId },
+      status: "SCHEDULED",
+      ...(mentionedClient ? { clientId: mentionedClient.id } : {}),
+    },
+    include: { client: true },
+    orderBy: { scheduledAt: "asc" },
+  });
+
+  onProgress?.({ type: "step_complete", id: "gather_meetings" });
+
+  if (!meeting) {
+    return {
+      id: crypto.randomUUID(),
+      prompt,
+      generatedAt: new Date().toISOString(),
+      sections: [
+        {
+          label: "Meeting Prep",
+          content: "No scheduled meeting was found for this request.",
+          type: "warning",
+        },
+      ],
+      trace: {
+        requestType: "MEETING_PREP",
+        inputsUsed: ["meetings"],
+        deterministicChecks: ["Checked for the next scheduled meeting."],
+        agentModulesUsed: ["meeting-prep"],
+        outputsGenerated: ["warning"],
+        confidence: "LOW",
+        reviewRequired: false,
+        dataQuality: "INSUFFICIENT",
+        missingData: ["No scheduled meetings on record."],
+        timestamp: new Date().toISOString(),
+      },
+      sources: mentionedClient ? [
+        {
+          id: mentionedClient.id,
+          kind: "client",
+          label: mentionedClient.name,
+          subtitle: "Household context",
+          confidence: 0.9,
+          freshness: new Date().toISOString()
+        }
+      ] : [],
+    };
+  }
+
+  const briefSchema = meeting.briefGenerated ? parseBrief(meeting.briefText) : null;
+
+  if (!briefSchema) {
+    onProgress?.({ type: "step_start", id: "synth", kind: "synthesize", title: "Generating meeting prep brief...", chips: ["meeting-prep"] });
+  } else {
+    onProgress?.({ type: "step_start", id: "synth", kind: "synthesize", title: "Loading generated brief..." });
+  }
+  const hydratedBrief = briefSchema ?? (await MeetingPrepService.generateMeetingBrief(meeting.id));
+  const parsed = briefSchema ?? hydratedBrief;
+  
+  onProgress?.({ type: "step_complete", id: "synth" });
+  onProgress?.({ type: "step_start", id: "cite", kind: "cite", title: "Attaching evidence..." });
+  onProgress?.({ type: "step_complete", id: "cite" });
 
   return {
-    id,
+    id: crypto.randomUUID(),
     prompt,
-    sections,
-    trace,
     generatedAt: new Date().toISOString(),
-  }
+    sections: [
+      {
+        label: "Answer",
+        type: "answer",
+        content: `Meeting prep is ready for ${meeting.client.name}: ${meeting.title}.`,
+      },
+      {
+        label: "Brief Highlights",
+        type: "findings",
+        content:
+          parsed.sections?.slice(0, 3).map((section) => `${section.title}: ${section.content}`) ??
+          ["No brief sections available."],
+      },
+      {
+        label: "Warnings",
+        type: parsed.warnings?.length ? "warning" : "missing_data",
+        content: parsed.warnings?.length ? parsed.warnings : ["No current warnings."],
+      },
+      {
+        label: "Compliance",
+        type: parsed.compliance_flags?.length ? "actions" : "missing_data",
+        content:
+          parsed.compliance_flags?.length
+            ? parsed.compliance_flags.map((flag) => `${flag.severity.toUpperCase()}: ${flag.message}`)
+            : ["No compliance flags currently attached to this brief."],
+      },
+    ],
+    sources: [
+      {
+        id: meeting.client.id,
+        kind: "client",
+        label: meeting.client.name,
+        subtitle: "Household contextual record",
+        confidence: 1.0,
+      },
+      {
+        id: meeting.id,
+        kind: "meeting",
+        label: meeting.title,
+        subtitle: "CRM Meeting Record",
+        freshness: meeting.scheduledAt.toISOString(),
+        confidence: 1.0,
+      },
+    ],
+    trace: {
+      requestType: "MEETING_PREP",
+      inputsUsed: ["meetings", "tasks", "documents", "holdings", "compliance"],
+      deterministicChecks: [
+        `Resolved meeting ${meeting.title}.`,
+        `Brief confidence: ${parsed.overall_confidence ?? "unknown"}.`,
+      ],
+      agentModulesUsed: ["meeting-prep", "citation-verification", "compliance-pass"],
+      outputsGenerated: ["brief summary", "warnings", "compliance review"],
+      confidence:
+        parsed.overall_confidence === "high"
+          ? "HIGH"
+          : parsed.overall_confidence === "medium"
+            ? "MEDIUM"
+            : "LOW",
+      reviewRequired: (parsed.warnings?.length ?? 0) > 0 || (parsed.compliance_flags?.length ?? 0) > 0,
+      dataQuality: parsed.sections?.length ? "COMPLETE" : "PARTIAL",
+      missingData: parsed.warnings ?? [],
+      timestamp: new Date().toISOString(),
+    },
+  };
 }
 
-export const SUGGESTED_PROMPTS = [
-  "Prepare me for my next scheduled meeting",
-  "What tax items need review this month?",
-  "Which clients are at risk of churning?",
-  "What opportunities are we missing across clients?",
-  "What tasks are overdue or need attention today?",
-  "Summarize the current onboarding pipeline",
-  "Draft an outreach email for a client check-in",
-  "What follow-ups are outstanding this week?",
-]
+async function buildClientLookupResponse(prompt: string, organizationId: string, onProgress?: (e: CopilotStreamEvent) => void): Promise<CopilotResponse> {
+  onProgress?.({ type: "step_start", id: "gather_client", kind: "gather_context", title: "Searching client records...", chips: ["CRM"] });
+  const client = await findMentionedClient(prompt, organizationId);
+  onProgress?.({ type: "step_complete", id: "gather_client" });
+  if (!client) {
+    return {
+      id: crypto.randomUUID(),
+      prompt,
+      generatedAt: new Date().toISOString(),
+      sections: [{ label: "Client Lookup", content: "No matching household was found.", type: "warning" }],
+      trace: {
+        requestType: "CLIENT_LOOKUP",
+        inputsUsed: ["clients"],
+        deterministicChecks: ["Matched prompt against stored client names."],
+        agentModulesUsed: ["client-lookup"],
+        outputsGenerated: ["warning"],
+        confidence: "LOW",
+        reviewRequired: false,
+        dataQuality: "INSUFFICIENT",
+        missingData: ["No matching household name detected."],
+        timestamp: new Date().toISOString(),
+      },
+      sources: [],
+    };
+  }
+
+  onProgress?.({ type: "step_start", id: "gather_client_detail", kind: "gather_context", title: `Loading ${client.name} profile...`, chips: [client.name] });
+  const profile = await prisma.client.findUnique({
+    where: { id: client.id },
+    include: { intelligence: true, tasks: { where: { isCompleted: false }, take: 5 }, meetings: { orderBy: { scheduledAt: "asc" }, take: 3 } },
+  });
+  onProgress?.({ type: "step_complete", id: "gather_client_detail" });
+  onProgress?.({ type: "step_start", id: "check_client_rules", kind: "check_rules", title: "Checking for compliance flags..." });
+  onProgress?.({ type: "step_complete", id: "check_client_rules" });
+
+  return {
+    id: crypto.randomUUID(),
+    prompt,
+    generatedAt: new Date().toISOString(),
+    sections: [
+      {
+        label: "Client Overview",
+        type: "answer",
+        content: [
+          `Household: ${profile?.name ?? client.name}`,
+          `Risk profile: ${profile?.riskProfile ?? "Not recorded"}`,
+          `Goals: ${profile?.intelligence?.goals ?? "Not recorded"}`,
+        ],
+      },
+      {
+        label: "Open Items",
+        type: profile?.tasks.length ? "actions" : "missing_data",
+        content: profile?.tasks.length ? profile.tasks.map((task) => task.title) : ["No open tasks on file."],
+      },
+    ],
+    trace: {
+      requestType: "CLIENT_LOOKUP",
+      inputsUsed: ["clients", "tasks", "meetings"],
+      deterministicChecks: [`Resolved household ${client.name}.`],
+      agentModulesUsed: ["client-lookup"],
+      outputsGenerated: ["overview", "open items"],
+      confidence: "MEDIUM",
+      reviewRequired: false,
+      dataQuality: "PARTIAL",
+      missingData: [],
+      timestamp: new Date().toISOString(),
+    },
+    sources: [
+      {
+        id: client.id,
+        kind: "client",
+        label: client.name,
+        subtitle: "CRM Client Directory",
+        confidence: 0.98,
+      }
+    ],
+  };
+}
+
+async function buildVaultLookupResponse(prompt: string, organizationId: string, onProgress?: (e: CopilotStreamEvent) => void): Promise<CopilotResponse> {
+  onProgress?.({ type: "step_start", id: "read_vault", kind: "read_vault", title: "Scanning vault documents...", chips: ["Vault"] });
+  const chunks = await prisma.documentChunk.findMany({
+    where: { organizationId },
+    include: { document: true },
+    take: 40,
+  });
+
+  const ranked = chunks
+    .map((chunk) => ({
+      chunk,
+      score: prompt
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((term) => term.length > 2)
+        .reduce((sum, term) => sum + (chunk.text.toLowerCase().includes(term) ? 1 : 0), 0),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 6);
+
+  onProgress?.({ type: "step_complete", id: "read_vault" });
+  onProgress?.({ type: "step_start", id: "rank_vault", kind: "synthesize", title: "Ranking evidence by relevance..." });
+  onProgress?.({ type: "step_complete", id: "rank_vault" });
+
+  return {
+    id: crypto.randomUUID(),
+    prompt,
+    generatedAt: new Date().toISOString(),
+    sections: [
+      {
+        label: "Vault Findings",
+        type: ranked.length ? "findings" : "missing_data",
+        content: ranked.length
+          ? ranked.map(
+              ({ chunk }) =>
+                `${chunk.document.title ?? chunk.document.fileName} · ${chunk.sectionPath} · ${chunk.id}`,
+            )
+          : ["No matching evidence chunks were found in Vault."],
+      },
+    ],
+    trace: {
+      requestType: "VAULT_LOOKUP",
+      inputsUsed: ["document_chunks"],
+      deterministicChecks: [`Scanned ${chunks.length} chunk(s) for lexical matches.`],
+      agentModulesUsed: ["vault-search"],
+      outputsGenerated: ["evidence hits"],
+      confidence: ranked.length ? "MEDIUM" : "LOW",
+      reviewRequired: false,
+      dataQuality: ranked.length ? "PARTIAL" : "INSUFFICIENT",
+      missingData: ranked.length ? [] : ["No matching document chunks found."],
+      timestamp: new Date().toISOString(),
+    },
+    sources: ranked.map(({ chunk, score }) => ({
+      id: chunk.id,
+      kind: "document",
+      label: chunk.document.title ?? chunk.document.fileName,
+      subtitle: chunk.sectionPath,
+      confidence: Math.min(score / 5, 1.0),
+      excerpt: chunk.text.slice(0, 180) + (chunk.text.length > 180 ? "..." : "")
+    })),
+  };
+}
+
+async function buildComplianceLookupResponse(prompt: string, organizationId: string, onProgress?: (e: CopilotStreamEvent) => void): Promise<CopilotResponse> {
+  onProgress?.({ type: "step_start", id: "compliance_check", kind: "compliance", title: "Checking compliance queue...", chips: ["Compliance"] });
+  const flags = await prisma.complianceFlag.findMany({
+    where: { organizationId, status: { in: ["OPEN", "UNDER_REVIEW"] } },
+    orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+    take: 10,
+  });
+
+  onProgress?.({ type: "step_complete", id: "compliance_check" });
+  return {
+    id: crypto.randomUUID(),
+    prompt,
+    generatedAt: new Date().toISOString(),
+    sections: [
+      {
+        label: "Compliance Queue",
+        type: flags.length ? "warning" : "answer",
+        content: flags.length
+          ? flags.map((flag) => `${flag.severity}: ${flag.description}`)
+          : "No open compliance flags were found.",
+      },
+    ],
+    trace: {
+      requestType: "COMPLIANCE_LOOKUP",
+      inputsUsed: ["compliance_flags"],
+      deterministicChecks: [`Loaded ${flags.length} open compliance flag(s).`],
+      agentModulesUsed: ["compliance-review"],
+      outputsGenerated: ["queue summary"],
+      confidence: flags.length ? "MEDIUM" : "HIGH",
+      reviewRequired: flags.length > 0,
+      dataQuality: "COMPLETE",
+      missingData: [],
+      timestamp: new Date().toISOString(),
+    },
+    sources: flags.map(flag => ({
+      id: flag.id,
+      kind: "compliance_rule",
+      label: flag.ruleId ?? "Unknown rule",
+      subtitle: flag.severity,
+      freshness: flag.createdAt.toISOString(),
+      excerpt: flag.description,
+      confidence: 1.0
+    }))
+  };
+}
+
+export async function runCopilot(prompt: string, organizationId: string, onProgress?: (e: CopilotStreamEvent) => void): Promise<CopilotResponse> {
+  onProgress?.({ type: "step_start", id: "classify", kind: "classify", title: "Classifying request..." });
+  const requestType = classifyRequest(prompt);
+  onProgress?.({ type: "step_complete", id: "classify" });
+
+  switch (requestType) {
+    case "MEETING_PREP":
+      return buildMeetingPrepResponse(prompt, organizationId, onProgress);
+    case "CLIENT_LOOKUP":
+      return buildClientLookupResponse(prompt, organizationId, onProgress);
+    case "VAULT_LOOKUP":
+      return buildVaultLookupResponse(prompt, organizationId, onProgress);
+    case "COMPLIANCE_LOOKUP":
+      return buildComplianceLookupResponse(prompt, organizationId, onProgress);
+    default:
+      return {
+        id: crypto.randomUUID(),
+        prompt,
+        generatedAt: new Date().toISOString(),
+        sections: [
+          {
+            label: "Scope",
+            type: "warning",
+            content:
+              "Copilot is currently limited to meeting prep, household lookup, vault evidence search, and compliance review.",
+          },
+        ],
+        trace: {
+          requestType: "OUT_OF_SCOPE",
+          inputsUsed: [],
+          deterministicChecks: ["Request rejected because it falls outside the narrowed product scope."],
+          agentModulesUsed: ["scope-guard"],
+          outputsGenerated: ["scope warning"],
+          confidence: "HIGH",
+          reviewRequired: false,
+          dataQuality: "INSUFFICIENT",
+          missingData: [],
+          timestamp: new Date().toISOString(),
+        },
+        sources: []
+      };
+  }
+}

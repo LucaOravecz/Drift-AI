@@ -1,0 +1,36 @@
+{
+  "id": "sample-review-001",
+  "household": {
+    "name": "Sample Household",
+    "riskProfile": "Moderate"
+  },
+  "meeting": {
+    "title": "Quarterly review",
+    "meetingType": "review"
+  },
+  "evidence": [
+    {
+      "id": "meeting:sample",
+      "title": "Prior review notes",
+      "text": "Client asked to revisit concentrated equity position and finalize donor-advised fund contribution."
+    }
+  ],
+  "expected": {
+    "mustMention": [
+      "concentrated equity position",
+      "donor-advised fund contribution"
+    ],
+    "prohibitedErrors": [
+      "invented performance data",
+      "uncited tax recommendations"
+    ],
+    "expectedCitations": [
+      "meeting:sample"
+    ],
+    "rubric": {
+      "factualAccuracy": 1,
+      "citationValidity": 1,
+      "complianceSafety": 1
+    }
+  }
+}

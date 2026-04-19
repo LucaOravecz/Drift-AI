@@ -11,10 +11,10 @@ import { AuditEventService } from "@/lib/services/audit-event.service";
  * Accepts multipart/form-data with fields: file (File), clientId (string)
  *
  * Processes:
- * 1. Extracts PDF content if available
- * 2. Infers document type using Claude API
- * 3. Performs intelligent extraction of key points, action items, risks
- * 4. Stores document with metadata and extracted content
+ * 1. Extracts raw text if available
+ * 2. Infers document type
+ * 3. Persists the document record
+ * 4. Builds grounded summaries plus semantic evidence chunks
  */
 export async function POST(req: NextRequest) {
   const auth = await authenticateApiRequest();
@@ -67,41 +67,37 @@ export async function POST(req: NextRequest) {
     // Convert file to buffer
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    // Extract PDF content if file is a PDF
-    let pdfContent = '';
-    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-      pdfContent = await DocumentService.extractPDFContent(fileBuffer);
+    let rawText = "";
+    if (isPdf) {
+      rawText = await DocumentService.extractPDFContent(fileBuffer);
+    } else if (isPlainText) {
+      rawText = await file.text();
     }
 
     // Infer document type using Claude API
-    const typeInference = await DocumentService.inferDocumentType(file.name, pdfContent);
+    const typeInference = await DocumentService.inferDocumentType(file.name, rawText);
     const documentType = typeInference.type;
-
-    // Extract key information from document
-    const extraction = await DocumentService.extract(
-      clientId,
-      file.name,
-      documentType,
-      client.name,
-      pdfContent
-    );
 
     // TODO: In production, upload file.stream() to S3/R2/GCS and store the URL
     // const s3Url = await uploadToS3(file, clientId)
 
-    const doc = await prisma.document.create({
+    const created = await prisma.document.create({
       data: {
         clientId,
+        organizationId: client.organizationId,
+        householdId: null,
         fileName: file.name,
+        title: file.name,
         fileSize: file.size,
         documentType,
-        status: "SUMMARIZED", // Already processed with AI extraction
-        summaryText: extraction.keyPoints.join('; '),
-        keyPoints: extraction.keyPoints,
-        actionItems: extraction.actionItems,
-        riskItems: extraction.riskItems,
+        sourceType: "uploaded_document",
+        authorityLevel: "medium",
+        status: "QUEUED",
+        rawText,
       },
     });
+
+    const doc = await DocumentService.processDocument(created.id, client.organizationId, rawText);
 
     await AuditEventService.appendEvent({
       organizationId: client.organizationId,
@@ -109,7 +105,7 @@ export async function POST(req: NextRequest) {
       action: "DOCUMENT_UPLOADED",
       target: `Document:${doc.id}`,
       targetId: doc.id,
-      details: `Document "${file.name}" (${(file.size / 1_000_000).toFixed(2)} MB) uploaded for client ${client.name}. Type: ${documentType} (confidence: ${(typeInference.confidence * 100).toFixed(0)}%). Extracted ${extraction.keyPoints.length} key points, ${extraction.actionItems.length} action items, ${extraction.riskItems.length} risks.`,
+      details: `Document "${file.name}" (${(file.size / 1_000_000).toFixed(2)} MB) uploaded for client ${client.name}. Type: ${documentType} (confidence: ${(typeInference.confidence * 100).toFixed(0)}%). Stored raw text length: ${rawText.length}.`,
       severity: "INFO",
       metadata: {
         clientId: client.id,
@@ -122,7 +118,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       document: doc,
       inference: typeInference,
-      extraction,
+      extraction: {
+        summaryText: doc.summaryText,
+        keyPoints: doc.keyPoints,
+        actionItems: doc.actionItems,
+        riskItems: doc.riskItems,
+      },
     }, { status: 201 });
   } catch (err) {
     console.error("[/api/documents/upload]", err);

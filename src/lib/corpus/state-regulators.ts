@@ -1,0 +1,63 @@
+export interface StateRegulatorManifest {
+  state: string
+  regulator: string
+  discoveryUrl: string
+  regulatorUrl?: string
+}
+
+// NASAA is used for discovery only. Underlying regulator URLs can be added
+// incrementally as they are verified from regulator-owned sources.
+export const STATE_REGULATOR_DISCOVERY_MANIFEST: StateRegulatorManifest[] = [
+  { state: "Alabama", regulator: "Alabama Securities Commission", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Alaska", regulator: "Alaska Division of Banking and Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Arizona", regulator: "Arizona Corporation Commission Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Arkansas", regulator: "Arkansas Securities Department", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "California", regulator: "California Department of Financial Protection and Innovation", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Colorado", regulator: "Colorado Division of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Connecticut", regulator: "Connecticut Department of Banking Securities and Business Investments Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Delaware", regulator: "Delaware Investor Protection Unit", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "District of Columbia", regulator: "District of Columbia Department of Insurance Securities and Banking", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Florida", regulator: "Florida Office of Financial Regulation", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Georgia", regulator: "Georgia Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Hawaii", regulator: "Hawaii Department of Commerce and Consumer Affairs Securities Commissioner", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Idaho", regulator: "Idaho Department of Finance Securities Bureau", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Illinois", regulator: "Illinois Secretary of State Securities Department", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Indiana", regulator: "Indiana Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Iowa", regulator: "Iowa Insurance Division Securities and Regulated Industries Bureau", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Kansas", regulator: "Kansas Office of the Securities Commissioner", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Kentucky", regulator: "Kentucky Department of Financial Institutions", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Louisiana", regulator: "Louisiana Office of Financial Institutions Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Maine", regulator: "Maine Office of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Maryland", regulator: "Maryland Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Massachusetts", regulator: "Massachusetts Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Michigan", regulator: "Michigan Department of Licensing and Regulatory Affairs Corporations Securities and Commercial Licensing Bureau", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Minnesota", regulator: "Minnesota Department of Commerce", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Mississippi", regulator: "Mississippi Secretary of State Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Missouri", regulator: "Missouri Commissioner of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Montana", regulator: "Montana Commissioner of Securities and Insurance", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Nebraska", regulator: "Nebraska Department of Banking and Finance", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Nevada", regulator: "Nevada Secretary of State Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "New Hampshire", regulator: "New Hampshire Bureau of Securities Regulation", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "New Jersey", regulator: "New Jersey Bureau of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "New Mexico", regulator: "New Mexico Regulation and Licensing Department Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "New York", regulator: "New York Attorney General Investor Protection Bureau", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "North Carolina", regulator: "North Carolina Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "North Dakota", regulator: "North Dakota Securities Department", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Ohio", regulator: "Ohio Division of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Oklahoma", regulator: "Oklahoma Department of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Oregon", regulator: "Oregon Division of Financial Regulation", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Pennsylvania", regulator: "Pennsylvania Department of Banking and Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Rhode Island", regulator: "Rhode Island Department of Business Regulation Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "South Carolina", regulator: "South Carolina Attorney General Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "South Dakota", regulator: "South Dakota Division of Insurance Securities Regulation", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Tennessee", regulator: "Tennessee Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Texas", regulator: "Texas State Securities Board", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Utah", regulator: "Utah Division of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Vermont", regulator: "Vermont Department of Financial Regulation Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Virginia", regulator: "Virginia State Corporation Commission Division of Securities and Retail Franchising", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Washington", regulator: "Washington Department of Financial Institutions Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "West Virginia", regulator: "West Virginia State Auditor Securities Commission", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Wisconsin", regulator: "Wisconsin Department of Financial Institutions Division of Securities", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Wyoming", regulator: "Wyoming Secretary of State Securities Division", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+  { state: "Puerto Rico", regulator: "Puerto Rico Office of the Commissioner of Financial Institutions", discoveryUrl: "https://www.nasaa.org/industry-resources/investment-advisers/state-investment-adviser-registration-information/" },
+]

@@ -73,7 +73,7 @@ export function DocumentsClient({ documents, stats, clients }: { documents: any[
       try {
         await processDocument(id);
         toast.success("Analysis complete", {
-          description: "AI has summarized the document and identified action items."
+          description: "Stored text and evidence chunks were rebuilt for this document."
         });
         setLocalDocs((prev) => prev.map((d) => d.id === id ? { ...d, status: "SUMMARIZED" } : d));
       } catch (err) {
@@ -103,8 +103,8 @@ export function DocumentsClient({ documents, stats, clients }: { documents: any[
     <div className="flex flex-col gap-6 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white/90">Document Intelligence</h1>
-          <p className="text-zinc-400 mt-1">Turn 200-page documents into focused 1-page executive briefs.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white/90">Vault</h1>
+          <p className="text-zinc-400 mt-1">Source documents and extracted evidence used for meeting prep and compliance review.</p>
         </div>
         <div className="flex items-center gap-2">
           {clients && clients.length > 0 && (
@@ -202,7 +202,7 @@ export function DocumentsClient({ documents, stats, clients }: { documents: any[
                 {selected.status === "PROCESSING" ? (
                   <div className="flex flex-col items-center justify-center h-48 gap-4">
                     <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                    <div className="text-zinc-500">AI is analyzing the document...</div>
+                    <div className="text-zinc-500">Rebuilding grounded document evidence...</div>
                   </div>
                 ) : selected.summaryText ? (
                   <div className="space-y-6 max-w-3xl">
@@ -273,7 +273,7 @@ export function DocumentsClient({ documents, stats, clients }: { documents: any[
                     )}
 
                     <div className="pt-4 border-t border-white/5 text-[10px] text-zinc-600 font-mono">
-                      Processed by Drift AI Document Intelligence · Advisor review required before client action
+                      Stored in Vault · Advisor review required before client action
                     </div>
                   </div>
                 ) : (
